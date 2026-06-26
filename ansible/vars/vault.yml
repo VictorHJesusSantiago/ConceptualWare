@@ -1,0 +1,48 @@
+# Concept #22 — Ansible Vault: Encrypted Secrets
+#
+# This file is encrypted with ansible-vault.
+# In the repo you commit the encrypted version; decrypt at runtime with:
+#   ansible-playbook ... --ask-vault-pass
+#   ansible-playbook ... --vault-password-file ~/.vault_pass
+#
+# Encrypt a new value:
+#   ansible-vault encrypt_string 'my-secret' --name 'vault_jwt_secret'
+#
+# Encrypt entire file:
+#   ansible-vault encrypt vars/vault.yml
+#
+# View decrypted:
+#   ansible-vault view vars/vault.yml
+#
+# Edit (decrypt → edit → re-encrypt):
+#   ansible-vault edit vars/vault.yml
+#
+# NOTE: This file is shown in plaintext for educational purposes only.
+# In production, this file MUST be encrypted before committing to VCS.
+---
+
+# JWT signing secret (RS256 private key path or HMAC secret)
+vault_jwt_secret: "CHANGE_ME_STRONG_RANDOM_SECRET_256_BITS"
+
+# MongoDB credentials
+vault_mongodb_username: conceptualware_app
+vault_mongodb_password: "CHANGE_ME_STRONG_PASSWORD"
+vault_mongodb_root_password: "CHANGE_ME_ROOT_PASSWORD"
+
+# Redis auth
+vault_redis_password: "CHANGE_ME_REDIS_AUTH"
+
+# Docker registry credentials
+vault_docker_registry_user: deploy-bot
+vault_docker_registry_password: "CHANGE_ME_REGISTRY_TOKEN"
+
+# Grafana admin
+vault_grafana_password: "CHANGE_ME_GRAFANA_ADMIN"
+
+# AWS credentials (if not using instance profile / IRSA)
+vault_aws_access_key_id: "CHANGE_ME"
+vault_aws_secret_access_key: "CHANGE_ME"
+
+# TLS certificate (base64-encoded PEM)
+vault_tls_cert: "CHANGE_ME_BASE64_CERT"
+vault_tls_key: "CHANGE_ME_BASE64_KEY"

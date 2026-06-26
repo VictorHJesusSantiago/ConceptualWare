@@ -1,0 +1,54 @@
+# Concept #22 — Ansible Variables
+#
+# Non-secret variables for the deployment playbook.
+# Secret variables live in vars/vault.yml (encrypted with ansible-vault).
+#
+# Precedence (lowest → highest):
+#   role defaults → inventory group_vars → inventory host_vars
+#   → playbook vars → vars_files → set_fact → extra_vars (-e flag)
+
+---
+# Application metadata
+app_name: conceptualware
+app_version: "1.5.0"
+
+# Docker image registry
+docker_registry: registry.conceptualware.io
+docker_image_backend: "{{ docker_registry }}/backend:{{ app_version }}"
+docker_image_frontend: "{{ docker_registry }}/frontend:{{ app_version }}"
+docker_image_gateway: "{{ docker_registry }}/gateway:{{ app_version }}"
+
+# Application paths
+app_dir: /opt/conceptualware
+app_log_dir: "{{ app_dir }}/logs"
+app_config_dir: "{{ app_dir }}/config"
+app_data_dir: "{{ app_dir }}/data"
+
+# Ports
+backend_port: 8080
+gateway_port: 3001
+frontend_port: 80
+
+# JVM settings
+java_heap_min: "512m"
+java_heap_max: "2g"
+java_gc: "G1GC"
+
+# MongoDB
+mongodb_host: mongodb-service
+mongodb_port: 27017
+mongodb_database: conceptualware
+mongodb_replica_set: rs0
+
+# Redis
+redis_host: redis-service
+redis_port: 6379
+
+# Health check
+health_check_url: "http://localhost:{{ backend_port }}/actuator/health"
+health_check_retries: 30
+health_check_delay: 10
+
+# Monitoring
+node_exporter_port: 9100
+prometheus_scrape_interval: 15s
