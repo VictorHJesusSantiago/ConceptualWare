@@ -1,0 +1,20 @@
+# Concept #22 — Ansible Role Defaults
+#
+# Defaults have the LOWEST precedence — any group_vars, host_vars,
+# or play vars override these without explicit override syntax.
+---
+
+# Docker daemon settings
+docker_log_driver: "json-file"
+docker_log_max_size: "100m"
+docker_log_max_file: "3"
+
+# Enable IPv6 in Docker network
+docker_ipv6: false
+
+# Docker data directory (default: /var/lib/docker)
+docker_data_root: /var/lib/docker
+
+# Metrics for Prometheus
+docker_metrics_addr: "0.0.0.0:9323"
+docker_experimental: false

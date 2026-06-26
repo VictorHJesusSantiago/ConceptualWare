@@ -1,0 +1,11 @@
+# Concept #22 — Ansible Handler: Docker restart
+#
+# Handlers run ONCE at the end of a play, only if notified.
+# Multiple tasks can notify the same handler — it still only runs once.
+# This prevents unnecessary restarts if both daemon.json AND another config changed.
+---
+
+- name: Restart Docker
+  service:
+    name: docker
+    state: restarted

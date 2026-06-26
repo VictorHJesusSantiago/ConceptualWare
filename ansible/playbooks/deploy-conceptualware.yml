@@ -1,0 +1,277 @@
+---
+# Concept #22 — Ansible: Configuration Management
+#
+# Ansible automates IT tasks: provisioning, configuration, deployment, orchestration.
+# Agentless: communicates via SSH (no agent needed on target hosts).
+#
+# Key concepts:
+#   Playbook:  YAML file with ordered list of plays → tasks
+#   Inventory: list of hosts/groups to manage
+#   Role:      reusable collection of tasks, templates, handlers, defaults
+#   Task:      atomic action (install package, copy file, run command)
+#   Handler:   triggered only when task reports "changed" (restart service)
+#   Variable:  parameterize tasks (host-specific, group-specific, vault-encrypted)
+#   Template:  Jinja2 templates for generating config files
+#   Module:    built-in functions (apt, yum, copy, template, service, docker_container...)
+#   Vault:     encrypt sensitive variables at rest
+#   Idempotent: running playbook multiple times = same result as running once
+#
+# Run: ansible-playbook -i inventory/hosts.yml playbooks/deploy-conceptualware.yml
+#   With vault: ansible-playbook ... --ask-vault-pass
+#   Check mode: ansible-playbook ... --check (dry run)
+#   Limit hosts: ansible-playbook ... --limit "app_servers"
+#   Tags:       ansible-playbook ... --tags "docker,config"
+
+- name: Provision and configure ConceptualWare application servers
+  hosts: app_servers
+  become: yes          # sudo escalation
+  gather_facts: yes    # collect server facts (OS, IP, memory, etc.)
+  vars_files:
+    - ../vars/main.yml
+    - ../vars/vault.yml  # ansible-vault encrypted secrets
+
+  vars:
+    app_user: conceptualware
+    app_dir: /opt/conceptualware
+    java_version: "21"
+    node_version: "20"
+    docker_compose_version: "2.24.5"
+
+  pre_tasks:
+    - name: Validate target OS
+      assert:
+        that:
+          - ansible_os_family in ["Debian", "RedHat"]
+        fail_msg: "Unsupported OS: {{ ansible_os_family }}"
+
+    - name: Update package cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600   # skip update if cache < 1h old (idempotent)
+      when: ansible_os_family == "Debian"
+
+  tasks:
+    # ── System dependencies ────────────────────────────────────────────────
+
+    - name: Install system packages
+      apt:
+        name:
+          - curl
+          - wget
+          - git
+          - htop
+          - vim
+          - unzip
+          - jq
+          - ntp
+          - fail2ban
+          - ufw
+        state: present
+      tags: [system]
+
+    - name: Configure UFW firewall
+      ufw:
+        rule: allow
+        port: "{{ item.port }}"
+        proto: "{{ item.proto }}"
+      loop:
+        - { port: "22",   proto: tcp }   # SSH
+        - { port: "80",   proto: tcp }   # HTTP
+        - { port: "443",  proto: tcp }   # HTTPS
+        - { port: "8080", proto: tcp }   # Backend (internal)
+      tags: [firewall]
+
+    - name: Enable UFW
+      ufw:
+        state: enabled
+        policy: deny    # default deny all
+      tags: [firewall]
+
+    # ── Application user ───────────────────────────────────────────────────
+
+    - name: Create application user
+      user:
+        name: "{{ app_user }}"
+        system: yes
+        shell: /bin/bash
+        home: "{{ app_dir }}"
+        create_home: yes
+      tags: [users]
+
+    # ── Java 21 ───────────────────────────────────────────────────────────
+
+    - name: Install Java 21 (Eclipse Temurin)
+      block:
+        - name: Add Eclipse Temurin APT key
+          apt_key:
+            url: https://packages.adoptium.net/artifactory/api/gpg/key/public
+            state: present
+
+        - name: Add Eclipse Temurin repository
+          apt_repository:
+            repo: "deb https://packages.adoptium.net/artifactory/deb {{ ansible_distribution_release }} main"
+            state: present
+
+        - name: Install Temurin JDK 21
+          apt:
+            name: temurin-21-jdk
+            state: present
+      tags: [java]
+
+    - name: Set JAVA_HOME
+      lineinfile:
+        path: /etc/environment
+        line: 'JAVA_HOME=/usr/lib/jvm/temurin-21-amd64'
+        create: yes
+      tags: [java]
+
+    # ── Node.js 20 ────────────────────────────────────────────────────────
+
+    - name: Install Node.js 20 (NodeSource)
+      block:
+        - name: Add NodeSource GPG key
+          apt_key:
+            url: https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key
+            state: present
+
+        - name: Add NodeSource repository
+          apt_repository:
+            repo: "deb https://deb.nodesource.com/node_20.x nodistro main"
+            state: present
+
+        - name: Install Node.js
+          apt:
+            name: nodejs
+            state: present
+      tags: [nodejs]
+
+    # ── Docker ────────────────────────────────────────────────────────────
+
+    - name: Install Docker
+      include_role:
+        name: docker
+      tags: [docker]
+
+    - name: Add app user to docker group
+      user:
+        name: "{{ app_user }}"
+        groups: docker
+        append: yes
+      tags: [docker]
+
+    # ── Application deployment ─────────────────────────────────────────────
+
+    - name: Create application directory structure
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0755"
+      loop:
+        - "{{ app_dir }}"
+        - "{{ app_dir }}/logs"
+        - "{{ app_dir }}/config"
+        - "{{ app_dir }}/data"
+      tags: [deploy]
+
+    - name: Copy docker-compose file
+      template:
+        src: ../templates/docker-compose.yml.j2
+        dest: "{{ app_dir }}/docker-compose.yml"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0644"
+      notify: Restart application  # trigger handler
+      tags: [deploy, config]
+
+    - name: Deploy environment configuration
+      template:
+        src: ../templates/env.j2
+        dest: "{{ app_dir }}/.env"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0600"   # restrict — contains secrets
+      no_log: true     # don't log task output (contains secrets)
+      notify: Restart application
+      tags: [deploy, config]
+
+    - name: Pull latest Docker images
+      docker_compose:
+        project_src: "{{ app_dir }}"
+        pull: yes
+      become_user: "{{ app_user }}"
+      tags: [deploy]
+
+    - name: Start application with docker-compose
+      docker_compose:
+        project_src: "{{ app_dir }}"
+        state: present
+        restarted: no   # restart only handled by notify
+      become_user: "{{ app_user }}"
+      tags: [deploy]
+
+    # ── Health check ───────────────────────────────────────────────────────
+
+    - name: Wait for backend to be healthy
+      uri:
+        url: "http://localhost:8080/actuator/health"
+        status_code: 200
+        timeout: 5
+      register: health_check
+      until: health_check.status == 200
+      retries: 30
+      delay: 10
+      tags: [verify]
+
+    - name: Display health check result
+      debug:
+        msg: "Backend is healthy: {{ health_check.json }}"
+      tags: [verify]
+
+    # ── Monitoring ────────────────────────────────────────────────────────
+
+    - name: Install and configure node_exporter (Prometheus)
+      include_role:
+        name: prometheus.prometheus.node_exporter
+      tags: [monitoring]
+
+  handlers:
+    - name: Restart application
+      docker_compose:
+        project_src: "{{ app_dir }}"
+        restarted: yes
+      become_user: "{{ app_user }}"
+
+    - name: Reload nginx
+      service:
+        name: nginx
+        state: reloaded
+
+  post_tasks:
+    - name: Verify all services running
+      docker_ps:
+        filter:
+          status: running
+      register: running_containers
+      tags: [verify]
+
+    - name: Assert required containers are running
+      assert:
+        that:
+          - "running_containers | selectattr('Names', 'contains', item) | list | length > 0"
+        fail_msg: "Container {{ item }} is not running!"
+      loop:
+        - backend
+        - gateway
+        - frontend
+        - mongodb
+        - redis
+      tags: [verify]
+
+- name: Configure load balancer
+  hosts: load_balancers
+  become: yes
+  roles:
+    - nginx_lb
+  tags: [lb]
