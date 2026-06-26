@@ -1,0 +1,162 @@
+spring:
+  application:
+    name: conceptualware-backend
+
+  data:
+    mongodb:
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://admin:secret@localhost:27017/conceptualware?authSource=admin}
+      auto-index-creation: true
+
+  cache:
+    type: simple
+    cache-names:
+      - algorithms
+      - users
+      - challenges
+      - leaderboard
+
+  security:
+    filter:
+      order: 10
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+  # Redis — Key-Value Store (Concept #11)
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 2
+
+  # H2 embedded SQL database (Concept #11: DDL/DML/JOINs/CTEs/Window Functions/MVCC)
+  datasource:
+    url: jdbc:h2:mem:conceptualware;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;NON_KEYWORDS=VALUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: none  # We manage schema manually in SqlConceptsService
+    show-sql: false
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  threads:
+    virtual:
+      enabled: true  # Project Loom — Virtual Threads (Concept 17)
+
+server:
+  port: 8080
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/plain
+    min-response-size: 2048
+  http2:
+    enabled: true  # HTTP/2 support (Concept 16)
+  error:
+    include-message: always
+    include-binding-errors: always
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,loggers,env
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true  # Liveness & Readiness probes (Concept 27)
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: ${spring.application.name}
+  # OpenTelemetry tracing (Concept 27 — Distributed Tracing, Span, Trace ID)
+  tracing:
+    sampling:
+      probability: 1.0          # sample 100% of traces in dev; tune per env
+    propagation:
+      type: w3c                  # W3C TraceContext propagation (interoperable with Jaeger/Zipkin)
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://jaeger:4318}/v1/traces
+
+logging:
+  level:
+    com.conceptualware: INFO
+    org.springframework.security: WARN
+    org.springframework.data.mongodb: WARN
+  # Structured JSON logging for ELK Stack (Concept 27 — Log aggregation, Kibana)
+  pattern:
+    console: >
+      {"timestamp":"%d{yyyy-MM-dd'T'HH:mm:ss.SSSZ}","level":"%level","service":"conceptualware-backend",
+      "trace_id":"%X{trace_id:-none}","span_id":"%X{span_id:-none}",
+      "logger":"%logger{36}","message":"%msg","thread":"%thread"}%n
+  file:
+    name: logs/conceptualware.log
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:dev-secret-change-in-production-must-be-256-bits}
+    access-token-expiration: 900000    # 15 minutes
+    refresh-token-expiration: 604800000 # 7 days
+  cors:
+    allowed-origins:
+      - "http://localhost:3000"
+      - "http://localhost:5173"
+      - "${FRONTEND_URL:http://localhost:80}"
+  rate-limit:
+    requests-per-minute: 60
+    burst-capacity: 100
+  algorithm:
+    execution-timeout-ms: 5000
+    max-input-size: 10000
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/conceptualware_test
+  cache:
+    type: none
+
+logging:
+  level:
+    com.conceptualware: DEBUG
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  data:
+    mongodb:
+      uri: ${SPRING_DATA_MONGODB_URI}
+
+logging:
+  level:
+    com.conceptualware: INFO
+    root: WARN

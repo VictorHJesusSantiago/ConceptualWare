@@ -1,0 +1,45 @@
+# Test profile: H2 in-memory, no Redis, no MongoDB external connections
+spring:
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/conceptualware-test
+      auto-index-creation: false
+    redis:
+      host: localhost
+      port: 6379
+
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;NON_KEYWORDS=VALUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+
+  h2:
+    console:
+      enabled: false
+
+  cache:
+    type: simple  # Use simple (ConcurrentHashMap) cache in tests — no Redis needed
+
+# Disable Redis auto-configuration in tests (avoids connection refused)
+autoconfigure:
+  exclude:
+    - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+    - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+
+management:
+  tracing:
+    sampling:
+      probability: 0.0  # No tracing in tests
+
+logging:
+  level:
+    com.conceptualware: WARN
+    org.springframework: WARN
+    org.hibernate: WARN
