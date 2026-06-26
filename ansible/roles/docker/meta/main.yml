@@ -1,0 +1,28 @@
+# Concept #22 — Ansible Role Metadata
+#
+# meta/main.yml defines role dependencies, supported platforms, and Galaxy metadata.
+# Role dependencies are installed automatically with ansible-galaxy install -r requirements.yml
+---
+galaxy_info:
+  role_name: docker
+  author: conceptualware
+  description: Install and configure Docker Engine on Debian/Ubuntu
+  license: MIT
+  min_ansible_version: "2.14"
+
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy     # 22.04 LTS
+        - focal     # 20.04 LTS
+    - name: Debian
+      versions:
+        - bullseye  # 11
+        - bookworm  # 12
+
+  galaxy_tags:
+    - docker
+    - containers
+    - devops
+
+dependencies: []   # no external role dependencies

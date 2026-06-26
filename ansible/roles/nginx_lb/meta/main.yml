@@ -1,0 +1,21 @@
+---
+galaxy_info:
+  role_name: nginx_lb
+  author: conceptualware
+  description: Configure NGINX as L7 load balancer with TLS termination
+  license: MIT
+  min_ansible_version: "2.14"
+
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, focal]
+    - name: Debian
+      versions: [bullseye, bookworm]
+
+  galaxy_tags:
+    - nginx
+    - load_balancer
+    - ssl
+    - proxy
+
+dependencies: []

@@ -1,0 +1,24 @@
+# Concept #22 — nginx_lb Role Defaults
+---
+nginx_worker_processes: auto
+nginx_worker_connections: 1024
+nginx_keepalive_timeout: 65
+nginx_client_max_body_size: "10m"
+
+# SSL
+nginx_ssl_protocols: "TLSv1.2 TLSv1.3"
+nginx_ssl_session_cache: "shared:SSL:10m"
+nginx_ssl_session_timeout: "1d"
+
+# Upstream health checks
+nginx_upstream_max_fails: 3
+nginx_upstream_fail_timeout: "30s"
+
+# Rate limiting
+nginx_rate_limit_zone: "api_limit"
+nginx_rate_limit: "100r/m"
+nginx_rate_limit_burst: 20
+
+# Logging
+nginx_access_log: "/var/log/nginx/conceptualware-access.log"
+nginx_error_log: "/var/log/nginx/conceptualware-error.log"

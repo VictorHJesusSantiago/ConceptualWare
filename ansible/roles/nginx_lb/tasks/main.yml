@@ -1,0 +1,104 @@
+# Concept #22 — Ansible Role: nginx_lb (NGINX Load Balancer)
+#
+# Configures NGINX as a Layer-7 load balancer (upstream proxy) in front
+# of the ConceptualWare gateway nodes.
+#
+# Load balancing methods (Concept #22 — Service Mesh / Load Balancing):
+#   round_robin    (default) — requests distributed sequentially
+#   least_conn     — send to server with fewest active connections
+#   ip_hash        — sticky sessions by client IP (preserves WebSocket)
+#   random         — random selection (two: pick 2, select better)
+#
+# This role uses least_conn for the API path and ip_hash for WebSocket.
+---
+
+# ── Install ────────────────────────────────────────────────────────────────────
+
+- name: Install NGINX
+  apt:
+    name: nginx
+    state: present
+    update_cache: yes
+
+- name: Install certbot (for Let's Encrypt TLS)
+  apt:
+    name:
+      - certbot
+      - python3-certbot-nginx
+    state: present
+
+# ── Remove default site ────────────────────────────────────────────────────────
+
+- name: Remove default NGINX site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Reload NGINX
+
+# ── Generate configuration ────────────────────────────────────────────────────
+
+- name: Deploy NGINX upstream configuration
+  template:
+    src: upstream.conf.j2
+    dest: /etc/nginx/conf.d/conceptualware-upstream.conf
+    mode: "0644"
+  notify: Reload NGINX
+
+- name: Deploy NGINX virtual host configuration
+  template:
+    src: vhost.conf.j2
+    dest: /etc/nginx/sites-available/conceptualware.conf
+    mode: "0644"
+  notify: Reload NGINX
+
+- name: Enable NGINX virtual host
+  file:
+    src: /etc/nginx/sites-available/conceptualware.conf
+    dest: /etc/nginx/sites-enabled/conceptualware.conf
+    state: link
+  notify: Reload NGINX
+
+# ── TLS / SSL ─────────────────────────────────────────────────────────────────
+
+- name: Create TLS certificate directory
+  file:
+    path: /etc/nginx/ssl
+    state: directory
+    mode: "0700"
+
+- name: Deploy TLS certificate from vault
+  copy:
+    content: "{{ vault_tls_cert | b64decode }}"
+    dest: /etc/nginx/ssl/conceptualware.crt
+    mode: "0644"
+  no_log: true
+
+- name: Deploy TLS private key from vault
+  copy:
+    content: "{{ vault_tls_key | b64decode }}"
+    dest: /etc/nginx/ssl/conceptualware.key
+    mode: "0600"
+  no_log: true
+  notify: Reload NGINX
+
+# ── Test configuration before reload ─────────────────────────────────────────
+
+- name: Test NGINX configuration
+  command: nginx -t
+  changed_when: false
+  notify: Reload NGINX
+
+# ── Service ────────────────────────────────────────────────────────────────────
+
+- name: Start and enable NGINX
+  service:
+    name: nginx
+    state: started
+    enabled: yes
+
+# ── Verify ────────────────────────────────────────────────────────────────────
+
+- name: Verify NGINX is listening on port 443
+  wait_for:
+    port: 443
+    timeout: 30
