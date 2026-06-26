@@ -1,0 +1,21 @@
+{
+  "log-driver": "{{ docker_log_driver }}",
+  "log-opts": {
+    "max-size": "{{ docker_log_max_size }}",
+    "max-file": "{{ docker_log_max_file }}"
+  },
+  "data-root": "{{ docker_data_root }}",
+  "storage-driver": "overlay2",
+  "live-restore": true,
+  "userland-proxy": false,
+  "default-ulimits": {
+    "nofile": {
+      "Name": "nofile",
+      "Hard": 65536,
+      "Soft": 65536
+    }
+  }{% if docker_experimental %},
+  "experimental": true,
+  "metrics-addr": "{{ docker_metrics_addr }}"{% endif %}
+
+}

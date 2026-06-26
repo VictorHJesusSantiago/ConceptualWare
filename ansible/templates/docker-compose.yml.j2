@@ -1,0 +1,112 @@
+# Concept #22 — Ansible Template: docker-compose.yml.j2
+#
+# Jinja2 template rendered by Ansible on the target host.
+# Variables ({{ }}) are replaced with values from inventory/vars.
+# Control structures ({%  %}) allow loops, conditionals, and blocks.
+#
+# Rendered to: {{ app_dir }}/docker-compose.yml
+
+version: "3.9"
+
+services:
+  backend:
+    image: {{ docker_image_backend }}
+    container_name: backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: production
+      JAVA_OPTS: "-Xms{{ java_heap_min }} -Xmx{{ java_heap_max }} -XX:+Use{{ java_gc }}"
+      MONGODB_URI: mongodb://{{ vault_mongodb_username }}:{{ vault_mongodb_password }}@{{ mongodb_host }}:{{ mongodb_port }}/{{ mongodb_database }}?replicaSet={{ mongodb_replica_set }}
+      REDIS_URL: redis://:{{ vault_redis_password }}@{{ redis_host }}:{{ redis_port }}
+      JWT_SECRET: "{{ vault_jwt_secret }}"
+    ports:
+      - "127.0.0.1:{{ backend_port }}:{{ backend_port }}"   # only listen on loopback
+    volumes:
+      - {{ app_log_dir }}/backend:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:{{ backend_port }}/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - app_network
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: "{{ java_heap_max | regex_replace('g', 'G') }}"
+
+  gateway:
+    image: {{ docker_image_gateway }}
+    container_name: gateway
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "{{ gateway_port }}"
+      BACKEND_URL: http://backend:{{ backend_port }}
+      REDIS_URL: redis://:{{ vault_redis_password }}@redis:{{ redis_port }}
+      JWT_SECRET: "{{ vault_jwt_secret }}"
+    ports:
+      - "127.0.0.1:{{ gateway_port }}:{{ gateway_port }}"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - app_network
+
+  frontend:
+    image: {{ docker_image_frontend }}
+    container_name: frontend
+    restart: unless-stopped
+    environment:
+      API_BASE_URL: /api
+    ports:
+      - "127.0.0.1:{{ frontend_port }}:80"
+    networks:
+      - app_network
+
+  mongodb:
+    image: mongo:7.0
+    container_name: mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: "{{ vault_mongodb_root_password }}"
+      MONGO_INITDB_DATABASE: "{{ mongodb_database }}"
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - app_network
+    command: --replSet {{ mongodb_replica_set }} --auth
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass {{ vault_redis_password }}
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - app_network
+
+volumes:
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  app_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
