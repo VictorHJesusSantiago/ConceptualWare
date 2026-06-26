@@ -1,0 +1,134 @@
+##
+## ConceptualWare — Observability Stack
+## Concept #27 — Observabilidade e Monitoramento (COMPLETE):
+##   Jaeger       — Distributed Tracing (Span, Trace ID, APM)
+##   Elasticsearch— Log storage (ELK Stack — E)
+##   Logstash     — Log ingestion & transformation (ELK Stack — L)
+##   Kibana       — Log visualization & dashboards (ELK Stack — K)
+##   Prometheus   — Metrics scraping (Counter, Gauge, Timer, Histogram)
+##   Grafana      — Metrics dashboards (SLI, SLO, Error Budget)
+##
+## Run with main stack:
+##   docker compose -f docker-compose.yml -f docker-compose.observability.yml up
+##
+
+services:
+
+  # ── Jaeger — Distributed Tracing (Concept 27: Rastreamento distribuído, Span, Trace ID) ──
+  jaeger:
+    image: jaegertracing/all-in-one:1.53
+    container_name: cw-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"        # Accept OTLP (OpenTelemetry Protocol) traces
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4318:4318"     # OTLP HTTP receiver (backend sends traces here)
+      - "4317:4317"     # OTLP gRPC receiver
+      - "14268:14268"   # Jaeger Thrift HTTP (Zipkin-compatible)
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:16686/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - cw-network
+
+  # ── Elasticsearch — Log storage (ELK: E) ────────────────────────────────────
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.3
+    container_name: cw-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - xpack.security.enabled=false          # disabled for dev; enable in prod
+      - xpack.security.http.ssl.enabled=false
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:9200/_cluster/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    networks:
+      - cw-network
+
+  # ── Logstash — Log ingestion & processing pipeline (ELK: L) ─────────────────
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.3
+    container_name: cw-logstash
+    volumes:
+      - ./observability/logstash/pipeline:/usr/share/logstash/pipeline:ro
+    ports:
+      - "5044:5044"    # Beats input (Filebeat)
+      - "5000:5000"    # TCP syslog input
+    environment:
+      LS_JAVA_OPTS: "-Xms256m -Xmx256m"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - cw-network
+
+  # ── Kibana — Log visualization & dashboards (ELK: K) ────────────────────────
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.3
+    container_name: cw-kibana
+    ports:
+      - "5601:5601"    # Kibana UI
+    environment:
+      ELASTICSEARCH_HOSTS: '["http://elasticsearch:9200"]'
+      XPACK_SECURITY_ENABLED: "false"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:5601/api/status"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+    networks:
+      - cw-network
+
+  # ── Prometheus — Metrics scraping (Concept 27: Counter, Gauge, Timer) ────────
+  prometheus:
+    image: prom/prometheus:v2.48.1
+    container_name: cw-prometheus
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"    # Prometheus UI
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+      - --web.enable-lifecycle
+    networks:
+      - cw-network
+
+  # ── Grafana — Metrics + Tracing dashboards (SLI, SLO, Error Budget) ──────────
+  grafana:
+    image: grafana/grafana:10.2.3
+    container_name: cw-grafana
+    ports:
+      - "3000:3000"    # Grafana UI
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: conceptualware
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+      - jaeger
+    networks:
+      - cw-network
+
+volumes:
+  elasticsearch-data:
+  grafana-data:
+
+networks:
+  cw-network:
+    external: true    # shared with main docker-compose.yml

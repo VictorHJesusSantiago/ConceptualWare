@@ -1,0 +1,44 @@
+# Java
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+.mvn/wrapper/maven-wrapper.jar
+hs_err_pid*
+
+# TypeScript / Node
+node_modules/
+dist/
+build/
+*.js.map
+.env
+.env.*
+!.env.example
+
+# React
+frontend/build/
+frontend/.env.local
+
+# Docker
+.docker/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# MongoDB
+data/

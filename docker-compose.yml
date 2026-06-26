@@ -1,0 +1,193 @@
+version: '3.9'
+
+services:
+  # MongoDB — NoSQL Document Store (Concept 11)
+  mongodb:
+    image: mongo:7.0
+    container_name: conceptualware-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-secret}
+      MONGO_INITDB_DATABASE: conceptualware
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+      - ./backend/src/main/resources/mongo-init.js:/docker-entrypoint-initdb.d/init.js:ro
+    networks:
+      - conceptualware-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Java Spring Boot Backend — Core engine (Java mandatory stack)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: conceptualware-backend
+    restart: unless-stopped
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://${MONGO_USER:-admin}:${MONGO_PASSWORD:-secret}@mongodb:27017/conceptualware?authSource=admin
+      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-change-in-production}
+      SPRING_PROFILES_ACTIVE: ${PROFILE:-prod}
+      JAVA_OPTS: "-XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xms512m -Xmx1g"
+    ports:
+      - "8080:8080"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - conceptualware-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # TypeScript/Node.js API Gateway — BFF layer (TypeScript mandatory stack)
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    container_name: conceptualware-gateway
+    restart: unless-stopped
+    environment:
+      BACKEND_URL: http://backend:8080
+      MONGODB_URI: mongodb://${MONGO_USER:-admin}:${MONGO_PASSWORD:-secret}@mongodb:27017/conceptualware?authSource=admin
+      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-change-in-production}
+      PORT: 3001
+      NODE_ENV: ${NODE_ENV:-production}
+      REDIS_URL: ${REDIS_URL:-}
+    ports:
+      - "3001:3001"
+    depends_on:
+      - backend
+      - mongodb
+    networks:
+      - conceptualware-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+  # React Frontend — JavaScript/TypeScript SPA (JS mandatory stack)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3001
+        VITE_WS_URL: ws://localhost:8080
+    container_name: conceptualware-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - gateway
+    networks:
+      - conceptualware-net
+
+  # Redis — Key-Value Store (Concept 11: caching, sessions, leaderboard, rate limiting)
+  redis:
+    image: redis:7.2-alpine
+    container_name: conceptualware-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - conceptualware-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Cassandra — Wide-Column Store (Concept 11: time-series, write-heavy workloads, CQL)
+  cassandra:
+    image: cassandra:4.1
+    container_name: conceptualware-cassandra
+    restart: unless-stopped
+    environment:
+      CASSANDRA_CLUSTER_NAME: ConceptualWareCluster
+      CASSANDRA_DC: datacenter1
+      CASSANDRA_RACK: rack1
+      HEAP_NEWSIZE: 128M
+      MAX_HEAP_SIZE: 512M
+    ports:
+      - "9042:9042"
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+    networks:
+      - conceptualware-net
+    healthcheck:
+      test: ["CMD-SHELL", "[ $$(nodetool statusgossip) = running ]"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Neo4j — Graph Database (Concept 11: graph queries, Cypher, relationship traversal)
+  neo4j:
+    image: neo4j:5.17-community
+    container_name: conceptualware-neo4j
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: ${NEO4J_AUTH:-neo4j/conceptualware}
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_memory_heap_initial__size: 256m
+      NEO4J_dbms_memory_heap_max__size: 512m
+    ports:
+      - "7474:7474"   # Browser UI
+      - "7687:7687"   # Bolt protocol
+    volumes:
+      - neo4j_data:/data
+    networks:
+      - conceptualware-net
+    healthcheck:
+      test: ["CMD", "neo4j", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # InfluxDB — Time-Series Database (Concept 11: metrics, IoT, monitoring data)
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: conceptualware-influxdb
+    restart: unless-stopped
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUX_USER:-admin}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUX_PASSWORD:-conceptualware}
+      DOCKER_INFLUXDB_INIT_ORG: conceptualware
+      DOCKER_INFLUXDB_INIT_BUCKET: metrics
+      DOCKER_INFLUXDB_INIT_RETENTION: 30d
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+    networks:
+      - conceptualware-net
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  mongo_data:
+  redis_data:
+  cassandra_data:
+  neo4j_data:
+  influxdb_data:
+
+networks:
+  conceptualware-net:
+    driver: bridge
