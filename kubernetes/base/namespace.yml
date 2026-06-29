@@ -1,0 +1,13 @@
+# Concept #22 — Kubernetes: Namespace
+# Namespaces provide logical isolation within a cluster.
+# Separate teams/environments (dev/staging/prod) share one cluster
+# without interfering with each other.
+# ResourceQuotas and NetworkPolicies are applied per-namespace.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: conceptualware
+  labels:
+    app.kubernetes.io/part-of: conceptualware
+    environment: production

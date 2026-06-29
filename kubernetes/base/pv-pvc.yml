@@ -1,0 +1,87 @@
+# Concept #22 — Kubernetes: PersistentVolume & PersistentVolumeClaim
+#
+# Storage lifecycle:
+#   PersistentVolume (PV): cluster-level storage resource (admin provision)
+#   PersistentVolumeClaim (PVC): namespace-level storage request (user/app)
+#   StorageClass: defines provisioner for dynamic volume creation
+#
+# Access modes:
+#   ReadWriteOnce (RWO): one node can mount read-write (most databases)
+#   ReadOnlyMany  (ROX): many nodes can mount read-only
+#   ReadWriteMany (RWX): many nodes can mount read-write (NFS, EFS)
+#
+# Reclaim policies:
+#   Retain: PV kept after PVC delete (manual cleanup required)
+#   Delete: PV deleted with PVC (default for dynamic provisioning)
+#   Recycle: deprecated
+---
+# StorageClass: Dynamic provisioning via AWS EBS gp3
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  iops: "3000"
+  throughput: "125"     # MB/s
+  encrypted: "true"
+  kmsKeyId: "arn:aws:kms:us-east-1:123456789:key/abc-def"  # KMS encryption
+volumeBindingMode: WaitForFirstConsumer  # delay binding until pod is scheduled
+allowVolumeExpansion: true               # allow PVC resize
+
+---
+# Static PersistentVolume (pre-provisioned, for legacy storage)
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongodb-pv-0
+  labels:
+    type: local
+    app: mongodb
+spec:
+  capacity:
+    storage: 50Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: gp3
+  csi:
+    driver: ebs.csi.aws.com
+    volumeHandle: "vol-0a1234567890abcdef"  # existing EBS volume ID
+    fsType: ext4
+
+---
+# PersistentVolumeClaim (used by pods directly — not via StatefulSet template)
+# StatefulSets define PVCs in volumeClaimTemplates; this is for standalone pods
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ml-models-pvc
+  namespace: conceptualware
+  labels:
+    app: backend
+spec:
+  accessModes:
+    - ReadWriteMany   # RWX needed if multiple backend pods need access
+  storageClassName: efs-sc  # EFS for RWX support
+  resources:
+    requests:
+      storage: 20Gi    # model files typically large
+
+---
+# EFS StorageClass (for ReadWriteMany)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: efs-sc
+provisioner: efs.csi.aws.com
+parameters:
+  provisioningMode: efs-ap        # EFS Access Point
+  fileSystemId: "fs-12345678"     # EFS filesystem ID
+  directoryPerms: "700"
+  gidRangeStart: "1000"
+  gidRangeEnd: "2000"
+  basePath: "/conceptualware"

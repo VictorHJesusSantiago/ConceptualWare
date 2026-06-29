@@ -1,0 +1,50 @@
+# Concept #22 — Kustomize: Base layer
+#
+# Kustomize provides template-free Kubernetes configuration management.
+# Overlays inherit this base and can patch/add resources without modifying base.
+#
+# Key Kustomize concepts:
+#   resources:      list of YAML files to include
+#   commonLabels:   labels added to every resource
+#   commonAnnotations: annotations added to every resource
+#   namePrefix:     prepend to all resource names
+#   nameSuffix:     append to all resource names
+#   images:         override container image tags (used by CI/CD)
+#   patches:        strategic merge patches or JSON patches
+#   configMapGenerator: generate ConfigMaps from files/literals
+#   secretGenerator:    generate Secrets from files/literals (with hashing)
+#
+# Apply: kubectl apply -k kubernetes/base/
+# Build: kubectl kustomize kubernetes/base/
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: conceptualware
+
+resources:
+  - namespace.yml
+  - configmap.yml
+  - secret.yml
+  - backend-deployment.yml
+  - frontend-deployment.yml
+  - gateway-deployment.yml
+  - services.yml
+  - ingress.yml
+  - statefulsets.yml
+  - hpa.yml
+  - daemonset.yml
+  - pv-pvc.yml
+
+# Labels applied to all resources
+commonLabels:
+  managed-by: kustomize
+  project: conceptualware
+
+# Image overrides — CI/CD updates these with new digests
+images:
+  - name: conceptualware/backend
+    newTag: latest
+  - name: conceptualware/frontend
+    newTag: latest
+  - name: conceptualware/gateway
+    newTag: latest

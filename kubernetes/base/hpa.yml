@@ -1,0 +1,144 @@
+# Concept #22 — Kubernetes: HPA (Horizontal Pod Autoscaler)
+#
+# HPA automatically scales the number of pod replicas based on metrics.
+# Works with:
+#   - CPU utilization (built-in)
+#   - Memory utilization (built-in via metrics-server)
+#   - Custom metrics (Prometheus via prometheus-adapter)
+#   - External metrics (SQS queue depth, RabbitMQ message count)
+#
+# Scale-out (add pods): when metric exceeds target for stabilizationWindowSeconds
+# Scale-in (remove pods): gradual, controlled by scaleDown policy
+#
+# VPA (Vertical Pod Autoscaler): adjusts CPU/memory requests — complementary to HPA
+# KEDA (Kubernetes Event-Driven Autoscaling): HPA for 50+ event sources
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-hpa
+  namespace: conceptualware
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+
+  minReplicas: 2    # never scale below 2 (high availability)
+  maxReplicas: 20   # never scale above 20 (cost control)
+
+  metrics:
+    # Scale on CPU utilization
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70    # scale out when avg CPU > 70%
+
+    # Scale on Memory utilization
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+    # Custom metric: algorithm execution queue depth (requires prometheus-adapter)
+    - type: Pods
+      pods:
+        metric:
+          name: algorithm_execution_queue_depth
+        target:
+          type: AverageValue
+          averageValue: "10"        # scale out when avg >10 queued per pod
+
+  behavior:
+    # Scale-out: aggressive (respond quickly to traffic spikes)
+    scaleUp:
+      stabilizationWindowSeconds: 0   # scale immediately
+      policies:
+        - type: Percent
+          value: 100                  # double pod count in one step
+          periodSeconds: 60
+        - type: Pods
+          value: 4                    # or add 4 pods max per minute
+          periodSeconds: 60
+      selectPolicy: Max               # use the policy that scales most
+
+    # Scale-in: conservative (prevent thrashing)
+    scaleDown:
+      stabilizationWindowSeconds: 300  # wait 5 min of low traffic before scaling down
+      policies:
+        - type: Percent
+          value: 25                    # reduce by at most 25% per step
+          periodSeconds: 60
+
+---
+# Gateway HPA
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: gateway-hpa
+  namespace: conceptualware
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: gateway
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+
+---
+# Concept #22 — FinOps: ResourceQuota & LimitRange
+# Controls resource consumption per namespace — essential for cost management
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: conceptualware-quota
+  namespace: conceptualware
+spec:
+  hard:
+    # Compute
+    requests.cpu: "20"        # total CPU requests across all pods
+    requests.memory: 40Gi
+    limits.cpu: "40"
+    limits.memory: 80Gi
+    # Objects
+    count/pods: "100"
+    count/services: "20"
+    count/persistentvolumeclaims: "30"
+    count/secrets: "50"
+    count/configmaps: "50"
+    # Storage
+    requests.storage: 500Gi
+
+---
+# LimitRange: default resource limits for pods that don't specify them
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: conceptualware-limits
+  namespace: conceptualware
+spec:
+  limits:
+    - type: Container
+      default:          # applied if container doesn't specify limits
+        cpu: "500m"
+        memory: "512Mi"
+      defaultRequest:   # applied if container doesn't specify requests
+        cpu: "100m"
+        memory: "128Mi"
+      max:              # maximum allowed per container
+        cpu: "4"
+        memory: "8Gi"
+      min:              # minimum allowed per container
+        cpu: "10m"
+        memory: "16Mi"
