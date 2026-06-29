@@ -1,0 +1,26 @@
+# Concept #27 — Grafana: Dashboard provisioning
+# Auto-provision Prometheus + Jaeger as data sources on startup
+
+apiVersion: 1
+
+datasources:
+  # Prometheus — metrics (SLI, SLO, Counter, Gauge, Histogram)
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      timeInterval: "15s"
+      httpMethod: POST
+
+  # Jaeger — distributed tracing (Span, Trace ID, APM)
+  - name: Jaeger
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686
+    jsonData:
+      tracesToLogs:
+        datasourceUid: loki
+        filterByTraceID: true
+        filterBySpanID: false

@@ -1,0 +1,50 @@
+# Concept #27 — Prometheus configuration:
+#   Counter, Gauge, Histogram, Summary scraping
+#   SLI data collection for SLO computation
+#   Alerting rules for SLA breach detection
+
+global:
+  scrape_interval:     15s   # How often Prometheus scrapes targets
+  evaluation_interval: 15s   # How often rules are evaluated
+  external_labels:
+    cluster: 'conceptualware-local'
+
+# ── Alerting ────────────────────────────────────────────────────────────────
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['alertmanager:9093']
+
+# ── Alert rules (SLO breach, error budget) ──────────────────────────────────
+# rule_files:
+#   - "alerts/*.yml"
+
+# ── Scrape configs ────────────────────────────────────────────────────────────
+scrape_configs:
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Spring Boot backend — /actuator/prometheus (Concept #27 — Métricas)
+  - job_name: 'conceptualware-backend'
+    metrics_path: '/actuator/prometheus'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['backend:8080']
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'jvm_.*|http_server_.*|algorithm_.*|synthetic_.*|auth_.*'
+        action: keep
+
+  # TypeScript gateway — /metrics (if added)
+  - job_name: 'conceptualware-gateway'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['gateway:3001']
+
+  # Jaeger — internal metrics
+  - job_name: 'jaeger'
+    static_configs:
+      - targets: ['jaeger:14269']

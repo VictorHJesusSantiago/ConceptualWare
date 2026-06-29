@@ -1,0 +1,113 @@
+# Concept #22 — Kustomize: Staging overlay
+#
+# Inherits base and applies staging-specific config:
+#   - 1 replica per service (cost savings)
+#   - Lower resource limits
+#   - Staging image tags (latest from feature branches)
+#   - Debug logging enabled
+#   - Reduced HPA min replicas
+#
+# Apply: kubectl apply -k kubernetes/overlays/staging/
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: conceptualware-staging
+
+resources:
+  - ../../base
+
+images:
+  - name: conceptualware/backend
+    newTag: "staging-latest"
+  - name: conceptualware/frontend
+    newTag: "staging-latest"
+  - name: conceptualware/gateway
+    newTag: "staging-latest"
+
+commonLabels:
+  environment: staging
+  managed-by: kustomize
+
+commonAnnotations:
+  team: "platform-engineering"
+  cost-center: "engineering-staging"
+
+patches:
+  # Staging: single replica (cost savings — no HA needed)
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: backend
+        namespace: conceptualware-staging
+      spec:
+        replicas: 1
+    target:
+      kind: Deployment
+      name: backend
+
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: frontend
+        namespace: conceptualware-staging
+      spec:
+        replicas: 1
+    target:
+      kind: Deployment
+      name: frontend
+
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: gateway
+        namespace: conceptualware-staging
+      spec:
+        replicas: 1
+    target:
+      kind: Deployment
+      name: gateway
+
+  # Staging: enable debug logging
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: backend
+        namespace: conceptualware-staging
+      spec:
+        template:
+          spec:
+            containers:
+              - name: backend
+                env:
+                  - name: LOG_LEVEL
+                    value: "DEBUG"
+                  - name: SPRING_PROFILES_ACTIVE
+                    value: "staging"
+                resources:
+                  requests:
+                    cpu: "200m"
+                    memory: "512Mi"
+                  limits:
+                    cpu: "1000m"
+                    memory: "1Gi"
+    target:
+      kind: Deployment
+      name: backend
+
+  # Staging HPA: scale between 1–3 (not 2–10 like production)
+  - patch: |-
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: backend-hpa
+        namespace: conceptualware-staging
+      spec:
+        minReplicas: 1
+        maxReplicas: 3
+    target:
+      kind: HorizontalPodAutoscaler
+      name: backend-hpa

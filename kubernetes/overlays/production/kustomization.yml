@@ -1,0 +1,110 @@
+# Concept #22 — Kustomize: Production overlay
+#
+# Inherits everything from base and applies production-specific patches:
+#   - Higher replica counts
+#   - Production image tags (pinned digest, not "latest")
+#   - Production resource limits (more CPU/memory)
+#   - Additional annotations (cost center, team ownership)
+#   - PodDisruptionBudgets for all stateful services
+#
+# Apply: kubectl apply -k kubernetes/overlays/production/
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: conceptualware
+
+# Inherit base resources
+resources:
+  - ../../base
+
+# Production-specific additional resources
+# (e.g., NetworkPolicy, additional PodDisruptionBudgets)
+# - network-policy.yml
+
+namePrefix: ""
+nameSuffix: ""
+
+# Production image tags — pin to digest for reproducibility
+# CI/CD pipeline updates these via kustomize edit set image
+images:
+  - name: conceptualware/backend
+    newTag: "1.5.0"
+  - name: conceptualware/frontend
+    newTag: "1.5.0"
+  - name: conceptualware/gateway
+    newTag: "1.5.0"
+
+# Production-specific labels
+commonLabels:
+  environment: production
+  managed-by: kustomize
+
+# Production-specific annotations (visible in kubectl describe)
+commonAnnotations:
+  team: "platform-engineering"
+  cost-center: "engineering-prod"
+  oncall: "pagerduty:P12345"
+
+# Patches — override base resource fields without editing base YAML
+patches:
+  # Backend: scale up to 3 replicas in production
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: backend
+        namespace: conceptualware
+      spec:
+        replicas: 3
+    target:
+      kind: Deployment
+      name: backend
+
+  # Frontend: scale up to 3 replicas
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: frontend
+        namespace: conceptualware
+      spec:
+        replicas: 3
+    target:
+      kind: Deployment
+      name: frontend
+
+  # Gateway: scale up to 3 replicas
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: gateway
+        namespace: conceptualware
+      spec:
+        replicas: 3
+    target:
+      kind: Deployment
+      name: gateway
+
+  # Backend: increase resource limits for production workload
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: backend
+        namespace: conceptualware
+      spec:
+        template:
+          spec:
+            containers:
+              - name: backend
+                resources:
+                  requests:
+                    cpu: "500m"
+                    memory: "1Gi"
+                  limits:
+                    cpu: "2000m"
+                    memory: "2Gi"
+    target:
+      kind: Deployment
+      name: backend
