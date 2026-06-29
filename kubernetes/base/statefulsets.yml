@@ -1,0 +1,197 @@
+# Concept #22 — Kubernetes: StatefulSet
+#
+# StatefulSet vs Deployment:
+#   Deployment:   pods are interchangeable, random names (backend-xyz, backend-abc)
+#   StatefulSet:  pods have stable identities (mongodb-0, mongodb-1, mongodb-2)
+#                 stable network names, ordered creation/deletion
+#
+# Use StatefulSet for: databases, message queues, distributed consensus systems
+# Each pod gets:
+#   - Stable hostname: <name>-<ordinal>.<service>.<namespace>.svc.cluster.local
+#   - Stable persistent storage (PVC bound to specific pod ordinal)
+#   - Ordered startup: pod N only starts after pod N-1 is Ready
+#   - Ordered deletion: reverse order (N-1 before N-2)
+---
+# MongoDB ReplicaSet via StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+  namespace: conceptualware
+  labels:
+    app: mongodb
+spec:
+  serviceName: mongodb-service  # must match headless service name
+  replicas: 3                   # 3-node replica set (1 primary, 2 secondaries)
+
+  selector:
+    matchLabels:
+      app: mongodb
+
+  # Ordered pod management (default) — ensures RS is initialized correctly
+  podManagementPolicy: OrderedReady
+
+  # Preserve data on scale-down (do NOT delete PVCs automatically)
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+
+  template:
+    metadata:
+      labels:
+        app: mongodb
+
+    spec:
+      terminationGracePeriodSeconds: 60
+
+      initContainers:
+        - name: mongo-init
+          image: mongo:7.0
+          command:
+            - bash
+            - -c
+            - |
+              # Initialize replica set on first pod (mongodb-0)
+              if [[ "${HOSTNAME}" == "mongodb-0" ]]; then
+                sleep 10
+                mongosh --host localhost:27017 --eval "
+                  rs.initiate({
+                    _id: 'rs0',
+                    members: [
+                      {_id:0, host:'mongodb-0.mongodb-service.conceptualware.svc.cluster.local:27017'},
+                      {_id:1, host:'mongodb-1.mongodb-service.conceptualware.svc.cluster.local:27017'},
+                      {_id:2, host:'mongodb-2.mongodb-service.conceptualware.svc.cluster.local:27017'}
+                    ]
+                  })
+                "
+              fi
+          resources:
+            requests: { cpu: "50m", memory: "64Mi" }
+            limits:   { cpu: "100m", memory: "128Mi" }
+
+      containers:
+        - name: mongodb
+          image: mongo:7.0
+          args:
+            - "--replSet"
+            - "rs0"
+            - "--bind_ip_all"
+            - "--wiredTigerCacheSizeGB"
+            - "1"
+          ports:
+            - containerPort: 27017
+              name: mongodb
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: conceptualware-secrets
+                  key: MONGO_ROOT_USERNAME
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: conceptualware-secrets
+                  key: MONGO_ROOT_PASSWORD
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2000m"
+              memory: "4Gi"
+          readinessProbe:
+            exec:
+              command: ["mongosh", "--eval", "db.adminCommand('ping')"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          volumeMounts:
+            - name: mongodb-data
+              mountPath: /data/db
+            - name: mongodb-config
+              mountPath: /data/configdb
+
+  # VolumeClaimTemplates: automatically creates PVC for each pod replica
+  # mongodb-0 → PVC mongodb-data-mongodb-0
+  # mongodb-1 → PVC mongodb-data-mongodb-1
+  volumeClaimTemplates:
+    - metadata:
+        name: mongodb-data
+      spec:
+        accessModes: [ReadWriteOnce]  # single pod read-write
+        storageClassName: "gp3"
+        resources:
+          requests:
+            storage: 50Gi
+
+    - metadata:
+        name: mongodb-config
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: "gp3"
+        resources:
+          requests:
+            storage: 1Gi
+
+---
+# Redis StatefulSet (for persistent Redis with AOF)
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  namespace: conceptualware
+  labels:
+    app: redis
+spec:
+  serviceName: redis-service
+  replicas: 1  # single instance; for HA use Redis Sentinel or Redis Cluster
+
+  selector:
+    matchLabels:
+      app: redis
+
+  template:
+    metadata:
+      labels:
+        app: redis
+
+    spec:
+      containers:
+        - name: redis
+          image: redis:7.2-alpine
+          args:
+            - "--appendonly"
+            - "yes"                # Append-Only File for durability
+            - "--appendfsync"
+            - "everysec"           # fsync every second (balance perf/durability)
+            - "--maxmemory"
+            - "512mb"
+            - "--maxmemory-policy"
+            - "allkeys-lru"        # Evict least recently used when full
+          ports:
+            - containerPort: 6379
+              name: redis
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: "gp3"
+        resources:
+          requests:
+            storage: 10Gi

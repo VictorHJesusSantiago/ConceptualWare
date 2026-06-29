@@ -1,0 +1,132 @@
+# Concept #22 — Kubernetes: Services
+#
+# A Service provides a stable network endpoint for pods.
+# Types:
+#   ClusterIP (default): internal-only, virtual IP within cluster
+#   NodePort:            exposes on each node's IP at a static port (30000-32767)
+#   LoadBalancer:        provisions cloud load balancer (AWS ELB, GCP LB)
+#   ExternalName:        DNS alias to external service
+#
+# Service discovery: pods find each other by DNS name <service-name>.<namespace>.svc.cluster.local
+# kube-proxy implements Service via iptables rules (or IPVS in production)
+---
+# Backend API Service (internal ClusterIP)
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: conceptualware
+  labels:
+    app: backend
+    tier: api
+  annotations:
+    # Prometheus scraping via Service (alternative to pod annotations)
+    prometheus.io/scrape: "true"
+spec:
+  type: ClusterIP
+  selector:
+    app: backend
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+
+---
+# Gateway Service (NodePort for local development, LoadBalancer for prod)
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-service
+  namespace: conceptualware
+  labels:
+    app: gateway
+    tier: gateway
+spec:
+  type: LoadBalancer
+  selector:
+    app: gateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3001
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: 3001
+      protocol: TCP
+  # Session affinity: route same client to same pod (for stateful connections)
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800  # 3 hours
+
+---
+# Frontend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: conceptualware
+spec:
+  type: ClusterIP
+  selector:
+    app: frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+
+---
+# MongoDB Service (headless for StatefulSet — each pod gets DNS entry)
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-service
+  namespace: conceptualware
+  labels:
+    app: mongodb
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service — enables direct pod DNS resolution
+  selector:
+    app: mongodb
+  ports:
+    - name: mongodb
+      port: 27017
+      targetPort: 27017
+
+---
+# Redis Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: conceptualware
+spec:
+  type: ClusterIP
+  selector:
+    app: redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+
+---
+# Neo4j Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: neo4j-service
+  namespace: conceptualware
+spec:
+  type: ClusterIP
+  selector:
+    app: neo4j
+  ports:
+    - name: bolt
+      port: 7687
+      targetPort: 7687
+    - name: http
+      port: 7474
+      targetPort: 7474
