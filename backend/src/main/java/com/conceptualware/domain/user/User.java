@@ -82,6 +82,14 @@ public class User extends AggregateRoot {
     // Refresh tokens (Concept #21 — Token management)
     private final Map<String, Instant> refreshTokens = new HashMap<>();
 
+    // ── Lockout por força bruta (Concept #21 — Brute Force Protection) ──────────
+    // Bloqueia a conta por LOCKOUT_DURATION após MAX_FAILED_ATTEMPTS consecutivos.
+    private static final int MAX_FAILED_ATTEMPTS = 5;
+    private static final java.time.Duration LOCKOUT_DURATION = java.time.Duration.ofMinutes(15);
+
+    private int failedLoginAttempts = 0;
+    private Instant lockedUntil;
+
     // Progress tracking — Set of completed concept IDs
     private final Set<String> completedConcepts = new HashSet<>();
 
@@ -152,6 +160,33 @@ public class User extends AggregateRoot {
 
     public void recordActivity() { this.lastActiveAt = Instant.now(); }
 
+    // ── Brute Force Protection ────────────────────────────────────────────────
+
+    /** Retorna true se a conta está bloqueada no momento. */
+    public boolean isLockedOut() {
+        return lockedUntil != null && Instant.now().isBefore(lockedUntil);
+    }
+
+    /** Registra uma tentativa de login inválida e aplica lockout se necessário. */
+    public void recordFailedLogin() {
+        this.failedLoginAttempts++;
+        if (this.failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
+            this.lockedUntil = Instant.now().plus(LOCKOUT_DURATION);
+        }
+    }
+
+    /** Reseta o contador após login bem-sucedido. */
+    public void resetFailedLogins() {
+        this.failedLoginAttempts = 0;
+        this.lockedUntil = null;
+    }
+
+    /** Tempo restante de lockout (zero se não bloqueado). */
+    public java.time.Duration lockoutRemaining() {
+        if (!isLockedOut()) return java.time.Duration.ZERO;
+        return java.time.Duration.between(Instant.now(), lockedUntil);
+    }
+
     public void promoteToAdmin() {
         this.roles.add(Role.ADMIN);
         registerEvent(new UserRoleChangedEvent(this.id, Role.ADMIN));
@@ -159,6 +194,21 @@ public class User extends AggregateRoot {
 
     public boolean isActive() { return status == Status.ACTIVE; }
     public boolean hasRole(Role role) { return roles.contains(role); }
+
+    // ── Getters seguros para coleções mutáveis ────────────────────────────────
+    // O @Getter do Lombok no nível da classe expõe as referências internas.
+    // Esses métodos sobrescrevem o comportamento para retornar cópias somente-leitura.
+
+    /** Papéis do usuário — imutável para o chamador. */
+    public Set<Role> getRoles() { return Collections.unmodifiableSet(roles); }
+
+    /** Conceitos concluídos — imutável. */
+    public Set<String> getCompletedConcepts() { return Collections.unmodifiableSet(completedConcepts); }
+
+    /** Favoritos — imutável. */
+    public Set<String> getFavorites() { return Collections.unmodifiableSet(favorites); }
+
+    // refreshTokens NÃO é exposto: contém segredos. Acesso somente via métodos de domínio.
 
     // ── Knowledge Progress (Concept #30 — recommendations) ────────────────────
 
@@ -168,46 +218,81 @@ public class User extends AggregateRoot {
     }
 
     private void updateSkillLevel() {
-        this.skillLevel = switch (totalPoints) {
-            case int p when p >= 10000 -> SkillLevel.EXPERT;
-            case int p when p >= 3000  -> SkillLevel.ADVANCED;
-            case int p when p >= 500   -> SkillLevel.INTERMEDIATE;
-            default                     -> SkillLevel.BEGINNER;
-        };
+        // NOTE: primitive type patterns in `switch` are not available in Java 21
+        // (records/sealed patterns are, but `case int p when ...` is not), so use guards.
+        if (totalPoints >= 10000)     this.skillLevel = SkillLevel.EXPERT;
+        else if (totalPoints >= 3000) this.skillLevel = SkillLevel.ADVANCED;
+        else if (totalPoints >= 500)  this.skillLevel = SkillLevel.INTERMEDIATE;
+        else                          this.skillLevel = SkillLevel.BEGINNER;
     }
 
     // ── Domain Events ─────────────────────────────────────────────────────────
+    // A Java `record` cannot extend a class (records implicitly extend java.lang.Record),
+    // so domain events that must be DomainEvent subtypes are immutable final classes.
 
-    public record UserRegisteredEvent(String email, String username) extends DomainEvent {
-        public UserRegisteredEvent { super("user.registered"); }
+    @Getter
+    public static final class UserRegisteredEvent extends DomainEvent {
+        private final String email;
+        private final String username;
         public UserRegisteredEvent(String email, String username) {
-            this();
-            // Java 21 compact record constructor
+            super("user.registered");
+            this.email = email;
+            this.username = username;
         }
     }
 
-    public record UserEmailVerifiedEvent(String email) extends DomainEvent {
-        public UserEmailVerifiedEvent { super("user.email.verified"); }
-        public UserEmailVerifiedEvent(String email) { this(); }
+    @Getter
+    public static final class UserEmailVerifiedEvent extends DomainEvent {
+        private final String email;
+        public UserEmailVerifiedEvent(String email) {
+            super("user.email.verified");
+            this.email = email;
+        }
     }
 
-    public record PointsEarnedEvent(String userId, int points, int totalPoints) extends DomainEvent {
-        public PointsEarnedEvent { super("user.points.earned"); }
-        public PointsEarnedEvent(String userId, int points, int totalPoints) { this(); }
+    @Getter
+    public static final class PointsEarnedEvent extends DomainEvent {
+        private final String userId;
+        private final int points;
+        private final int totalPoints;
+        public PointsEarnedEvent(String userId, int points, int totalPoints) {
+            super("user.points.earned");
+            this.userId = userId;
+            this.points = points;
+            this.totalPoints = totalPoints;
+        }
     }
 
-    public record ChallengeCompletedEvent(String userId, String challengeId) extends DomainEvent {
-        public ChallengeCompletedEvent { super("challenge.completed"); }
-        public ChallengeCompletedEvent(String userId, String challengeId) { this(); }
+    @Getter
+    public static final class ChallengeCompletedEvent extends DomainEvent {
+        private final String userId;
+        private final String challengeId;
+        public ChallengeCompletedEvent(String userId, String challengeId) {
+            super("challenge.completed");
+            this.userId = userId;
+            this.challengeId = challengeId;
+        }
     }
 
-    public record ConceptCompletedEvent(String userId, String conceptId) extends DomainEvent {
-        public ConceptCompletedEvent { super("concept.completed"); }
-        public ConceptCompletedEvent(String userId, String conceptId) { this(); }
+    @Getter
+    public static final class ConceptCompletedEvent extends DomainEvent {
+        private final String userId;
+        private final String conceptId;
+        public ConceptCompletedEvent(String userId, String conceptId) {
+            super("concept.completed");
+            this.userId = userId;
+            this.conceptId = conceptId;
+        }
     }
 
-    public record UserRoleChangedEvent(String userId, Role newRole) extends DomainEvent {
-        public UserRoleChangedEvent { super("user.role.changed"); }
-        public UserRoleChangedEvent(String userId, Role newRole) { this(); }
+    @Getter
+    public static final class UserRoleChangedEvent extends DomainEvent {
+        private final String userId;
+        private final Role newRole;
+        public UserRoleChangedEvent(String userId, Role newRole) {
+            super("user.role.changed");
+            this.userId = userId;
+            this.newRole = newRole;
+        }
     }
 }

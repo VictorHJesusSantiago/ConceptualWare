@@ -8,6 +8,7 @@ import org.springframework.data.mongodb.core.index.TextIndexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.*;
+import java.util.Collections;
 
 /**
  * Algorithm aggregate — central domain entity for the platform.
@@ -110,4 +111,20 @@ public class Algorithm extends AggregateRoot {
     }
 
     public boolean isPopular() { return viewCount > 1000 || likeCount > 100; }
+
+    // ── Getters seguros para coleções mutáveis ────────────────────────────────
+
+    /** Implementações — lista imutável para o chamador. */
+    public List<Implementation> getImplementations() {
+        return Collections.unmodifiableList(implementations);
+    }
+
+    /** Tags — lista imutável. */
+    public List<String> getTags() { return Collections.unmodifiableList(tags); }
+
+    /** Pré-requisitos — lista imutável. */
+    public List<String> getPrerequisites() { return Collections.unmodifiableList(prerequisites); }
+
+    /** Aplicações — lista imutável. */
+    public List<String> getApplications() { return Collections.unmodifiableList(applications); }
 }

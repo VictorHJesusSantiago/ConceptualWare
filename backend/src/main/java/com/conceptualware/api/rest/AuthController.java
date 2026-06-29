@@ -37,11 +37,13 @@ public class AuthController {
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
     public AuthResponse register(@Valid @RequestBody RegisterRequest request) {
-        // Sanitize input — Concept #21
-        if (userRepository.existsByEmail(request.email()))
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already registered");
-        if (userRepository.existsByUsername(request.username()))
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Username already taken");
+        // OWASP A01 — user enumeration: mensagem idêntica para email e username existentes.
+        // Mensagens distintas permitem que atacante confirme se um e-mail/username está cadastrado.
+        boolean emailExists    = userRepository.existsByEmail(request.email());
+        boolean usernameExists = userRepository.existsByUsername(request.username());
+        if (emailExists || usernameExists)
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Registration failed — credentials already in use");
 
         // BCrypt password hashing — Concept #21
         String passwordHash = passwordEncoder.encode(request.password());
@@ -57,15 +59,28 @@ public class AuthController {
     @PostMapping("/login")
     public AuthResponse login(@Valid @RequestBody LoginRequest request) {
         User user = userRepository.findByEmail(request.email())
+            // Mesma mensagem para "usuário não existe" e "senha errada" — evita enumeração.
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
 
-        // Constant-time comparison (prevent timing attacks) — Concept #21
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash()))
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+        // Lockout check — Concept #21 (brute force protection)
+        if (user.isLockedOut()) {
+            long secondsRemaining = user.lockoutRemaining().getSeconds();
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                "Account temporarily locked. Try again in " + secondsRemaining + " seconds.");
+        }
 
-        if (!user.isActive())
+        if (!user.isActive()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account not active");
+        }
 
+        // Constant-time comparison (prevent timing attacks) — Concept #21
+        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            user.recordFailedLogin();
+            userRepository.save(user);
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+        }
+
+        user.resetFailedLogins();
         user.recordActivity();
         userRepository.save(user);
 
@@ -101,8 +116,15 @@ public class AuthController {
         String refreshToken = body.get("refreshToken");
         if (refreshToken == null) return ResponseEntity.badRequest().build();
 
-        jwtService.extractUserId(refreshToken);
-        // Token revocation would go here
+        // Server-side session invalidation: actually revoke the refresh token so it
+        // cannot be reused after logout. A07 — Authentication Failures.
+        if (jwtService.validateToken(refreshToken) && jwtService.isRefreshToken(refreshToken)) {
+            String userId = jwtService.extractUserId(refreshToken);
+            userRepository.findById(userId).ifPresent(user -> {
+                user.revokeRefreshToken(refreshToken);
+                userRepository.save(user);
+            });
+        }
         return ResponseEntity.noContent().build();
     }
 
@@ -125,7 +147,14 @@ public class AuthController {
     public record RegisterRequest(
         @NotBlank @Email String email,
         @NotBlank @Size(min = 3, max = 50) @Pattern(regexp = "^[a-zA-Z0-9_-]+$") String username,
-        @NotBlank @Size(min = 8, max = 128) String password
+        // Política sincronizada com o gateway (gateway/src/routes/auth.ts — RegisterSchema).
+        // SSOT: qualquer mudança aqui deve refletir no schema Zod do gateway e vice-versa.
+        @NotBlank
+        @Size(min = 8, max = 128)
+        @Pattern(regexp = ".*[A-Z].*", message = "Password must contain at least one uppercase letter")
+        @Pattern(regexp = ".*[a-z].*", message = "Password must contain at least one lowercase letter")
+        @Pattern(regexp = ".*[0-9].*", message = "Password must contain at least one digit")
+        String password
     ) {}
 
     public record LoginRequest(
