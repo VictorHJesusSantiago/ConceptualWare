@@ -1,0 +1,176 @@
+# Concept #22 — Kubernetes: Gateway (API Gateway) Deployment
+#
+# Node.js Express gateway handles:
+#   - JWT authentication
+#   - Rate limiting (Redis-backed)
+#   - Reverse proxy to backend
+#   - WebSocket upgrade
+#
+# Scaling: stateless — safe to scale horizontally.
+# Session state lives in Redis, not in-process.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: conceptualware
+  labels:
+    app: gateway
+    tier: gateway
+    version: v1.0.0
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: gateway
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: gateway
+        tier: gateway
+        version: v1.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3001"
+        prometheus.io/path: "/metrics"
+    spec:
+      # ── Security ──────────────────────────────────────────────────────────
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      automountServiceAccountToken: false
+
+      # ── Pod anti-affinity: spread across nodes ─────────────────────────────
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: gateway
+                topologyKey: kubernetes.io/hostname
+
+      # ── Init: wait for Redis and Backend ──────────────────────────────────
+      initContainers:
+        - name: wait-for-redis
+          image: busybox:1.36
+          command: ['sh', '-c',
+            'until nc -z redis-service 6379; do echo "waiting for Redis"; sleep 2; done']
+
+        - name: wait-for-backend
+          image: busybox:1.36
+          command: ['sh', '-c',
+            'until nc -z backend-service 8080; do echo "waiting for backend"; sleep 2; done']
+
+      containers:
+        - name: gateway
+          image: conceptualware/gateway:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3001
+              protocol: TCP
+
+          # ── Environment ───────────────────────────────────────────────────
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3001"
+            - name: BACKEND_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: conceptualware-config
+                  key: BACKEND_URL
+            - name: REDIS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: conceptualware-config
+                  key: REDIS_URL
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: conceptualware-secrets
+                  key: jwt-secret
+            # Rate limiting: 100 req/min per user (Concept #22 — FinOps / fair use)
+            - name: RATE_LIMIT_WINDOW_MS
+              value: "60000"
+            - name: RATE_LIMIT_MAX
+              value: "100"
+
+          # ── Resources ──────────────────────────────────────────────────────
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+          # ── Probes ────────────────────────────────────────────────────────
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+            successThreshold: 1
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            failureThreshold: 3
+
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            failureThreshold: 12
+            periodSeconds: 5   # 60s total startup budget
+
+          # ── Graceful shutdown hook ─────────────────────────────────────────
+          lifecycle:
+            preStop:
+              exec:
+                # Drain in-flight requests before pod termination
+                command: ["sh", "-c", "sleep 5"]
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        - name: tmp
+          emptyDir: {}
+
+      terminationGracePeriodSeconds: 35   # > preStop (5s) + drain time
+
+---
+# Concept #22 — PodDisruptionBudget: protect gateway availability during node drains
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: gateway-pdb
+  namespace: conceptualware
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: gateway

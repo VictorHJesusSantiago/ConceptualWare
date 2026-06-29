@@ -1,0 +1,180 @@
+# Concept #22 — Kubernetes: Deployment
+#
+# Deployment manages a ReplicaSet which manages Pods.
+# Key features:
+#   - Desired state declaration (replicas: 3)
+#   - Rolling update strategy (max 1 unavailable, max 1 surge)
+#   - Automatic restart on crash (restartPolicy: Always)
+#   - Resource limits prevent noisy-neighbor problems
+#   - Liveness/Readiness probes for health-based routing
+#   - Pod Disruption Budget ensures availability during node maintenance
+#
+# Deployment → ReplicaSet → Pod (3 copies) → Container
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: conceptualware
+  labels:
+    app: backend
+    tier: api
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/part-of: conceptualware
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+spec:
+  replicas: 3
+
+  selector:
+    matchLabels:
+      app: backend
+
+  # Rolling update: no downtime
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1   # at most 1 pod unavailable during update
+      maxSurge: 1         # at most 1 extra pod during update
+
+  template:
+    metadata:
+      labels:
+        app: backend
+        tier: api
+        # Istio sidecar injection label
+        sidecar.istio.io/inject: "true"
+      annotations:
+        # Prometheus scraping
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/actuator/prometheus"
+
+    spec:
+      serviceAccountName: conceptualware-sa
+
+      # Prefer scheduling pods on different nodes (soft anti-affinity)
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values: [backend]
+                topologyKey: kubernetes.io/hostname
+
+      # Init container: wait for MongoDB to be ready
+      initContainers:
+        - name: wait-for-mongo
+          image: busybox:1.35
+          command: ['sh', '-c', 'until nc -z mongodb-service 27017; do echo waiting for mongodb; sleep 2; done']
+          resources:
+            requests: { cpu: "10m", memory: "16Mi" }
+            limits:   { cpu: "50m", memory: "32Mi" }
+
+      containers:
+        - name: backend
+          image: conceptualware/backend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+
+          # Inject config from ConfigMap and Secrets
+          envFrom:
+            - configMapRef:
+                name: conceptualware-config
+            - secretRef:
+                name: conceptualware-secrets
+
+          # Resource requests (scheduling) and limits (enforcement)
+          # Requests: guaranteed minimum. Limits: hard maximum.
+          resources:
+            requests:
+              cpu: "250m"       # 0.25 vCPU
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"      # 1 vCPU
+              memory: "1Gi"
+
+          # Readiness probe: stop sending traffic to pod if it fails
+          # Use this for startup/dependency checks
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+            successThreshold: 1
+
+          # Liveness probe: restart pod if it's unhealthy
+          # Use this for deadlock detection
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            failureThreshold: 3
+
+          # Startup probe: gives slow-starting containers time to initialize
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            failureThreshold: 30
+            periodSeconds: 10
+
+          # Graceful shutdown: allow in-flight requests to complete
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 15"]
+
+          # Security hardening
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+
+          volumeMounts:
+            - name: tmp-dir
+              mountPath: /tmp
+            - name: logs
+              mountPath: /app/logs
+
+      # ImagePullSecrets for private registry
+      imagePullSecrets:
+        - name: registry-credentials
+
+      # Grace period for shutdown (should be > preStop sleep + request timeout)
+      terminationGracePeriodSeconds: 60
+
+      volumes:
+        - name: tmp-dir
+          emptyDir: {}
+        - name: logs
+          emptyDir: {}
+
+---
+# Concept #22 — Pod Disruption Budget
+# Ensures minimum availability during voluntary disruptions (node drain, upgrades)
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend-pdb
+  namespace: conceptualware
+spec:
+  minAvailable: 2    # at least 2 pods must be running
+  selector:
+    matchLabels:
+      app: backend

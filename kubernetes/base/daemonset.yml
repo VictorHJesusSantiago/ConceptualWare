@@ -1,0 +1,150 @@
+# Concept #22 — Kubernetes: DaemonSet
+#
+# DaemonSet ensures ONE pod runs on EVERY node (or every selected node).
+# Used for: log collection, metrics collection, node monitoring,
+#           security agents, CNI plugins, storage drivers.
+#
+# DaemonSet vs Deployment:
+#   Deployment: any number of pods on any nodes
+#   DaemonSet:  exactly one pod per node (new nodes auto-get a pod)
+---
+# Node-level log collector (Fluentd → Elasticsearch)
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: log-collector
+  namespace: conceptualware
+  labels:
+    app: log-collector
+    tier: infrastructure
+spec:
+  selector:
+    matchLabels:
+      app: log-collector
+
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1  # update one node at a time
+
+  template:
+    metadata:
+      labels:
+        app: log-collector
+
+    spec:
+      # Run on all nodes including master (override taint toleration)
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+
+      # Required for reading node-level logs
+      hostNetwork: false
+      hostPID: false
+
+      serviceAccountName: log-collector-sa
+
+      containers:
+        - name: fluentd
+          image: fluent/fluentd-kubernetes-daemonset:v1.16-debian-elasticsearch8-1
+          env:
+            - name: FLUENT_ELASTICSEARCH_HOST
+              value: "elasticsearch.monitoring.svc.cluster.local"
+            - name: FLUENT_ELASTICSEARCH_PORT
+              value: "9200"
+            - name: FLUENT_ELASTICSEARCH_SCHEME
+              value: "http"
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName  # inject node name into logs
+
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "200Mi"
+            limits:
+              cpu: "200m"
+              memory: "400Mi"
+
+          volumeMounts:
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+            - name: containers
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+            - name: config
+              mountPath: /fluentd/etc
+
+      volumes:
+        - name: varlog
+          hostPath:
+            path: /var/log      # node's /var/log directory
+        - name: containers
+          hostPath:
+            path: /var/lib/docker/containers
+        - name: config
+          configMap:
+            name: fluentd-config
+
+---
+# Node metrics exporter (Prometheus node_exporter)
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-exporter
+  namespace: conceptualware
+  labels:
+    app: node-exporter
+spec:
+  selector:
+    matchLabels:
+      app: node-exporter
+
+  template:
+    metadata:
+      labels:
+        app: node-exporter
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9100"
+        prometheus.io/path: "/metrics"
+
+    spec:
+      hostNetwork: true
+      hostPID: true
+
+      tolerations:
+        - operator: Exists     # run on all nodes regardless of taints
+
+      containers:
+        - name: node-exporter
+          image: quay.io/prometheus/node-exporter:v1.7.0
+          args:
+            - "--path.rootfs=/host"
+            - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+          ports:
+            - containerPort: 9100
+              name: metrics
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "32Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
+          securityContext:
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65534
+          volumeMounts:
+            - name: root
+              mountPath: /host
+              readOnly: true
+
+      volumes:
+        - name: root
+          hostPath:
+            path: /

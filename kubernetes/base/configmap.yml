@@ -1,0 +1,60 @@
+# Concept #22 — Kubernetes: ConfigMap
+# ConfigMaps decouple configuration from container images.
+# Changes to ConfigMap don't require rebuilding the Docker image.
+# Sensitive values belong in Secrets (see secret.yml), not ConfigMaps.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: conceptualware-config
+  namespace: conceptualware
+  labels:
+    app.kubernetes.io/part-of: conceptualware
+data:
+  # Application settings
+  SPRING_PROFILES_ACTIVE: "prod"
+  BACKEND_PORT: "8080"
+  GATEWAY_PORT: "3001"
+  NODE_ENV: "production"
+
+  # Database endpoints
+  MONGO_DATABASE: "conceptualware"
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  NEO4J_URI: "bolt://neo4j-service:7687"
+
+  # Algorithm execution limits
+  ALGO_EXECUTION_TIMEOUT_MS: "5000"
+  ALGO_MAX_INPUT_SIZE: "100000"
+
+  # Rate limiting
+  RATE_LIMIT_API: "60"
+  RATE_LIMIT_AUTH: "5"
+  RATE_LIMIT_ALGO_EXEC: "20"
+
+  # CORS
+  ALLOWED_ORIGINS: "https://conceptualware.io,https://www.conceptualware.io"
+
+  # MFA
+  MFA_ISSUER: "ConceptualWare"
+
+  # Logging
+  LOG_LEVEL: "INFO"
+
+  # Nginx config for frontend
+  nginx.conf: |
+    server {
+      listen 80;
+      root /usr/share/nginx/html;
+      index index.html;
+
+      location / {
+        try_files $uri $uri/ /index.html;
+      }
+
+      location /api/ {
+        proxy_pass http://gateway-service:3001/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+      }
+    }

@@ -1,0 +1,126 @@
+# Concept #22 — Kubernetes: Frontend Deployment
+#
+# Serves the React SPA via NGINX.
+# Stateless — safe to scale horizontally and roll without affinity.
+#
+# Key decisions:
+#   - topologySpreadConstraints: spread replicas across zones for HA
+#   - configMap volume: inject runtime env vars at startup (API_BASE_URL)
+#   - resources.requests kept low — NGINX is CPU-light at idle
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: conceptualware
+  labels:
+    app: frontend
+    tier: ui
+    version: v1.0.0
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0    # always keep at least 2 serving
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: frontend
+        tier: ui
+        version: v1.0.0
+      annotations:
+        prometheus.io/scrape: "false"   # NGINX stub_status not needed here
+    spec:
+      # ── Security ──────────────────────────────────────────────────────────
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101           # nginx user
+        fsGroup: 101
+      automountServiceAccountToken: false
+
+      # ── Topology spread (zone HA) ──────────────────────────────────────────
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: frontend
+
+      containers:
+        - name: frontend
+          image: conceptualware/frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+
+          # ── Runtime env from ConfigMap ─────────────────────────────────────
+          env:
+            - name: API_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: conceptualware-config
+                  key: API_BASE_URL
+            - name: WS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: conceptualware-config
+                  key: WS_URL
+
+          # ── Resources ──────────────────────────────────────────────────────
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+
+          # ── Probes ────────────────────────────────────────────────────────
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            failureThreshold: 3
+
+          # ── Volume: NGINX config override ─────────────────────────────────
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: nginx.conf
+              readOnly: true
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false   # NGINX needs /tmp, /var/cache
+            capabilities:
+              drop: ["ALL"]
+              add: ["NET_BIND_SERVICE"]      # bind port 80
+
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: conceptualware-config
+            items:
+              - key: nginx.conf
+                path: nginx.conf
+
+      # ── Graceful shutdown ─────────────────────────────────────────────────
+      terminationGracePeriodSeconds: 30
