@@ -1,0 +1,421 @@
+@startuml UML_ClassDiagram
+
+' Concept #24 — UML Class Diagram
+' Shows: classes, attributes, methods, relationships (association, composition,
+'        aggregation, inheritance, realization, dependency)
+
+title UML Class Diagram — ConceptualWare Core Domain
+
+skinparam classAttributeIconSize 0
+skinparam monochrome false
+
+' ── User Domain ─────────────────────────────────────────────────────────────
+
+class User {
+    -id: String
+    -email: String
+    -passwordHash: String
+    -role: UserRole
+    -createdAt: Instant
+    -totpSecret: String
+    -mfaEnabled: boolean
+    +isAdmin(): boolean
+    +generateOtpUri(): String
+}
+
+enum UserRole {
+    LEARNER
+    CONTRIBUTOR
+    ADMIN
+}
+
+class UserProgress {
+    -userId: String
+    -conceptId: String
+    -completedAt: Instant
+    -attempts: int
+    -bestExecutionMs: long
+    +isCompleted(): boolean
+    +incrementAttempts(): void
+}
+
+class Leaderboard {
+    -userId: String
+    -score: long
+    -rank: int
+    -lastUpdated: Instant
+    +updateScore(delta: long): void
+}
+
+' ── Concept Domain ───────────────────────────────────────────────────────────
+
+abstract class Concept {
+    #id: String
+    #name: String
+    #category: Category
+    #difficulty: Difficulty
+    #description: String
+    +{abstract} execute(input: Map): ExecutionResult
+    +{abstract} validate(result: ExecutionResult): boolean
+}
+
+enum Difficulty {
+    BEGINNER
+    INTERMEDIATE
+    ADVANCED
+    EXPERT
+}
+
+enum Category {
+    DATA_STRUCTURES
+    ALGORITHMS
+    OS_CONCEPTS
+    DATABASES
+    SECURITY
+    ML_AI
+    CLOUD
+    COMPILER
+}
+
+class AlgorithmConcept {
+    -timeComplexity: String
+    -spaceComplexity: String
+    -pseudocode: String
+    +execute(input: Map): ExecutionResult
+    +validate(result: ExecutionResult): boolean
+}
+
+class DataStructureConcept {
+    -operations: List<String>
+    -invariants: List<String>
+    +execute(input: Map): ExecutionResult
+    +validate(result: ExecutionResult): boolean
+    +visualize(): String
+}
+
+class ExecutionResult {
+    -conceptId: String
+    -input: Map
+    -output: Object
+    -executionMs: long
+    -memoryBytes: long
+    -correct: boolean
+    -explanation: String
+    -steps: List<String>
+}
+
+' ── Challenge Domain ─────────────────────────────────────────────────────────
+
+class Challenge {
+    -id: String
+    -title: String
+    -conceptId: String
+    -testCases: List<TestCase>
+    -constraints: String
+    -solutionTemplate: String
+    +grade(submission: Submission): GradeResult
+}
+
+class TestCase {
+    -input: Map
+    -expectedOutput: Object
+    -hidden: boolean
+    -timeoutMs: long
+}
+
+class Submission {
+    -userId: String
+    -challengeId: String
+    -code: String
+    -language: Language
+    -submittedAt: Instant
+}
+
+enum Language {
+    JAVA
+    TYPESCRIPT
+    PYTHON
+    C_CPP
+}
+
+class GradeResult {
+    -passed: int
+    -total: int
+    -score: double
+    -feedback: String
+    -executionMs: long
+}
+
+' ── Relationships ────────────────────────────────────────────────────────────
+
+User "1" *-- "many" UserProgress : has
+User "1" o-- "1" Leaderboard : ranked in
+
+Concept <|-- AlgorithmConcept : extends
+Concept <|-- DataStructureConcept : extends
+Concept "1" *-- "1..*" Challenge : has
+
+Challenge "1" *-- "1..*" TestCase : contains
+Submission "many" --> "1" Challenge : submitted to
+User "1" --> "many" Submission : makes
+Challenge "1" --> "many" GradeResult : produces
+
+AlgorithmConcept --> ExecutionResult : produces
+DataStructureConcept --> ExecutionResult : produces
+
+User --> UserRole : has role
+Concept --> Category : belongs to
+Concept --> Difficulty : has level
+Submission --> Language : written in
+
+note top of Concept : Abstract base — all 800+ concepts\nare instances of Concept subclasses
+
+@enduml
+
+' ═════════════════════════════════════════════════════════════════════════════
+
+@startuml UML_SequenceDiagram
+
+' Concept #24 — UML Sequence Diagram
+' Shows: interaction between participants over time (message order matters)
+
+title Sequence Diagram — Algorithm Execution Flow
+
+actor Developer
+participant "React SPA" as Frontend
+participant "API Gateway" as Gateway
+participant "Backend API" as Backend
+participant "Cache (Redis)" as Cache
+participant "MongoDB" as DB
+participant "WebSocket" as WS
+
+Developer -> Frontend : Select "Binary Search" concept
+activate Frontend
+
+Frontend -> Gateway : GET /api/v1/concepts/binary-search
+activate Gateway
+
+Gateway -> Gateway : Rate limit check (60 req/min)
+Gateway -> Backend : GET /concepts/binary-search (forward)
+activate Backend
+
+Backend -> Cache : GET concept:binary-search
+activate Cache
+Cache --> Backend : MISS (not cached)
+deactivate Cache
+
+Backend -> DB : findById("binary-search")
+activate DB
+DB --> Backend : ConceptDocument
+deactivate DB
+
+Backend -> Cache : SET concept:binary-search TTL=10min
+Backend --> Gateway : ConceptResponse (200 OK)
+deactivate Backend
+
+Gateway --> Frontend : ConceptResponse
+deactivate Gateway
+
+Frontend -> WS : CONNECT ws://api/ws/execute
+activate WS
+
+Developer -> Frontend : Submit execution with input [1,3,5,7,9], target=7
+
+Frontend -> WS : EXECUTE {"conceptId": "binary-search", "input": {...}}
+WS -> Backend : execute(request)
+activate Backend
+
+Backend -> Backend : BinarySearch.search([1,3,5,7,9], 7)
+note right of Backend
+  Step 1: mid=2, arr[2]=5 < 7 → search right half
+  Step 2: mid=3, arr[3]=7 == 7 → FOUND at index 3
+  Comparisons: 2
+  Time: O(log n)
+end note
+
+Backend --> WS : PROGRESS {"step": 1, "lo": 0, "hi": 4, "mid": 2}
+WS --> Frontend : Stream step 1
+
+Backend --> WS : PROGRESS {"step": 2, "lo": 3, "hi": 4, "mid": 3, "found": true}
+WS --> Frontend : Stream step 2
+
+Backend --> WS : COMPLETE {"index": 3, "comparisons": 2, "correct": true}
+deactivate Backend
+
+Frontend -> Backend : POST /api/v1/submissions
+activate Backend
+Backend -> DB : save(submission)
+Backend -> Backend : updateLeaderboard(userId, +10 points)
+Backend --> Frontend : SubmissionResult
+deactivate Backend
+
+WS --> Frontend : Close connection
+deactivate WS
+
+Frontend --> Developer : Show result + explanation + steps
+deactivate Frontend
+
+@enduml
+
+' ═════════════════════════════════════════════════════════════════════════════
+
+@startuml UML_StateMachine
+
+' Concept #24 — UML State Machine Diagram
+' Shows: states and transitions for an entity over its lifetime
+
+title State Machine — User Authentication Flow
+
+[*] --> Unauthenticated : Initial state
+
+Unauthenticated --> Authenticating : User submits credentials
+Authenticating --> Invalid : Wrong email/password (after 3 attempts → Locked)
+Authenticating --> MFARequired : Valid credentials + MFA enabled
+Authenticating --> Authenticated : Valid credentials + MFA disabled
+Invalid --> Unauthenticated : User can retry
+Authenticating --> Locked : 5 consecutive failures
+
+Locked --> Unauthenticated : Email unlock link clicked (30 min expiry)
+
+MFARequired --> Authenticated : Valid TOTP code (±1 step window)
+MFARequired --> MFAFailed : Invalid TOTP code (3 attempts)
+MFAFailed --> Locked : Max TOTP failures reached
+MFARequired --> Unauthenticated : Cancel / timeout (5 min)
+
+Authenticated --> TokenRefresh : Access token expires (15 min)
+TokenRefresh --> Authenticated : Valid refresh token (7 day)
+TokenRefresh --> Unauthenticated : Expired/invalid refresh token → re-login
+
+Authenticated --> Unauthenticated : User logout (revoke refresh token)
+Authenticated --> Unauthenticated : Admin force-logout
+Authenticated --> [*] : Account deleted
+
+state Authenticated {
+    [*] --> Active
+    Active --> Idle : No activity 30 min
+    Idle --> Active : User action
+    Idle --> SessionExpired : Idle > 60 min
+    SessionExpired --> [*]
+}
+
+@enduml
+
+' ═════════════════════════════════════════════════════════════════════════════
+
+@startuml UML_Component
+
+' Concept #24 — UML Component Diagram
+' Shows: high-level components and their provided/required interfaces
+
+title Component Diagram — ConceptualWare System
+
+component [React SPA] as spa {
+    interface "REST Client" as rest_client
+    interface "WebSocket Client" as ws_client
+    interface "LocalStorage" as ls
+}
+
+component [API Gateway\nNode.js] as gateway {
+    interface "REST API" as rest_api
+    interface "WebSocket" as ws
+    interface "Rate Limiter" as rl
+    interface "Auth Middleware" as auth
+}
+
+component [Backend API\nSpring Boot] as backend {
+    interface "Algorithm Executor" as algo_exec
+    interface "Concept Registry" as registry
+    interface "ML Engine" as ml
+    interface "Compiler Engine" as compiler
+}
+
+component [MongoDB\nDocument Store] as mongodb
+component [Redis\nCache + Pub/Sub] as redis
+component [Neo4j\nGraph DB] as neo4j
+
+spa --> gateway : REST HTTP/WS
+gateway --> backend : HTTP
+backend --> mongodb : Driver
+backend --> redis : Lettuce
+backend --> neo4j : Bolt
+
+gateway ..> rl : uses
+gateway ..> auth : uses
+backend ..> algo_exec : uses
+backend ..> registry : uses
+
+@enduml
+
+' ═════════════════════════════════════════════════════════════════════════════
+
+@startuml UML_Activity
+
+' Concept #24 — UML Activity Diagram (like a flowchart, but richer)
+' Shows: workflow with branching, forking, joining
+
+title Activity Diagram — Concept Learning Workflow
+
+|Developer|
+start
+
+:Select concept category;
+:Browse available concepts;
+:Choose concept to study;
+
+fork
+    |Developer|
+    :Read theory + explanation;
+    :Study code examples;
+    :Check time/space complexity;
+
+fork again
+    |Developer|
+    :Watch algorithm visualization;
+
+end fork
+
+:Attempt challenge;
+
+|Backend|
+:Receive submission;
+:Compile user code (sandbox);
+:Run test cases;
+:Evaluate correctness;
+
+if (All tests passed?) then (yes)
+    |Backend|
+    :Award points;
+    :Update progress;
+    :Update leaderboard;
+
+    |Developer|
+    :View results + solution;
+    :Read optimal solution explanation;
+
+    if (More challenges?) then (yes)
+        :Select next challenge;
+        backward :Attempt challenge;
+    else (no)
+        :Mark concept completed;
+    endif
+else (no)
+    |Backend|
+    :Return failure details;
+    :Show hint;
+
+    |Developer|
+    :Review failing test cases;
+    :Debug solution;
+    backward :Attempt challenge;
+endif
+
+:Check learning path progress;
+
+if (Category complete?) then (yes)
+    :Unlock next category;
+    :Celebrate milestone!;
+endif
+
+stop
+
+@enduml

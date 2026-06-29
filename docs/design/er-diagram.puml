@@ -1,0 +1,178 @@
+@startuml ER_ConceptualWare
+
+' Concept #24 — Entity-Relationship (ER) Diagram
+' Shows: entities, attributes, primary keys, foreign keys, cardinality
+' Notation: Chen's notation (entities = rectangles, attributes = ovals)
+'           or Crow's Foot notation (more common in RDBMS tools)
+
+title ER Diagram — ConceptualWare Data Model (Crow's Foot Notation)
+
+skinparam linetype ortho
+
+entity "users" {
+    * _id : ObjectId <<PK>>
+    --
+    * email : String <<UNIQUE>>
+    * passwordHash : String
+    * role : Enum [LEARNER, ADMIN, CONTRIBUTOR]
+    * createdAt : ISODate
+    * updatedAt : ISODate
+    totpSecret : String
+    mfaEnabled : Boolean
+    emailVerified : Boolean
+    githubId : String
+    displayName : String
+    bio : String
+    avatarUrl : String
+}
+
+entity "concepts" {
+    * _id : String <<PK>> (slug: "binary-search")
+    --
+    * name : String
+    * category : String
+    * subcategory : String
+    * difficulty : Enum
+    * description : String
+    * theory : String
+    * pseudocode : String
+    timeComplexity : String
+    spaceComplexity : String
+    javaImplementation : String
+    typescriptImpl : String
+    tags : String[]
+    prerequisites : String[] <<FK → concepts._id>>
+    createdAt : ISODate
+}
+
+entity "challenges" {
+    * _id : ObjectId <<PK>>
+    --
+    * conceptId : String <<FK → concepts._id>>
+    * title : String
+    * description : String
+    * difficulty : Enum
+    constraints : String
+    solutionTemplate : String
+    testCases : TestCase[]
+    hints : String[]
+    solution : String
+    active : Boolean
+    createdAt : ISODate
+}
+
+entity "submissions" {
+    * _id : ObjectId <<PK>>
+    --
+    * userId : ObjectId <<FK → users._id>>
+    * challengeId : ObjectId <<FK → challenges._id>>
+    * conceptId : String <<FK → concepts._id>>
+    * code : String
+    * language : Enum [JAVA, TYPESCRIPT, PYTHON]
+    * status : Enum [PENDING, RUNNING, PASSED, FAILED, TLE, ERROR]
+    * score : Double
+    testResults : TestResult[]
+    executionMs : Long
+    memoryBytes : Long
+    passedCount : Integer
+    totalCount : Integer
+    submittedAt : ISODate
+}
+
+entity "user_progress" {
+    * _id : ObjectId <<PK>>
+    --
+    * userId : ObjectId <<FK → users._id>>
+    * conceptId : String <<FK → concepts._id>>
+    * completed : Boolean
+    * attempts : Integer
+    * bestScore : Double
+    * bestExecutionMs : Long
+    firstAttemptAt : ISODate
+    completedAt : ISODate
+    ' Compound unique index: (userId, conceptId)
+}
+
+entity "leaderboard" {
+    * _id : ObjectId <<PK>>
+    --
+    * userId : ObjectId <<FK → users._id>>
+    * totalScore : Long
+    * rank : Integer
+    * weeklyScore : Long
+    * weeklyRank : Integer
+    conceptsCompleted : Integer
+    challengesSolved : Integer
+    streak : Integer
+    lastUpdated : ISODate
+}
+
+entity "execution_results" {
+    * _id : ObjectId <<PK>>
+    --
+    * userId : ObjectId <<FK → users._id>>
+    * conceptId : String <<FK → concepts._id>>
+    * executionMs : Long
+    * memoryBytes : Long
+    * correct : Boolean
+    * input : Document
+    * output : Document
+    steps : String[]
+    explanation : String
+    executedAt : ISODate
+}
+
+entity "algorithm_metrics" {
+    ' Stored in InfluxDB time-series DB (shown here for completeness)
+    * timestamp : Timestamp <<PK (time)>>
+    --
+    * conceptId : String <<TAG>>
+    * userId : String <<TAG>>
+    executionMs : Long <<FIELD>>
+    memoryBytes : Long <<FIELD>>
+    correct : Boolean <<FIELD>>
+    inputSize : Integer <<FIELD>>
+}
+
+entity "audit_log" {
+    * _id : ObjectId <<PK>>
+    --
+    * userId : ObjectId <<FK → users._id>>
+    * action : String
+    * resource : String
+    * ipAddress : String
+    * userAgent : String
+    * result : Enum [SUCCESS, FAILURE]
+    * timestamp : ISODate
+    details : Document
+}
+
+' ── Relationships ────────────────────────────────────────────────────────────
+
+users ||--o{ submissions : "makes"
+users ||--|| leaderboard : "has"
+users ||--o{ user_progress : "tracks"
+users ||--o{ execution_results : "generates"
+users ||--o{ audit_log : "generates"
+
+concepts ||--o{ challenges : "has"
+concepts ||--o{ user_progress : "tracked in"
+concepts ||--o{ execution_results : "produces"
+concepts }o--o{ concepts : "requires (prerequisites)"
+
+challenges ||--o{ submissions : "receives"
+
+note top of algorithm_metrics
+  Stored in InfluxDB
+  (time-series optimized)
+  Retention: 90 days raw,
+  1 year downsampled
+end note
+
+note top of audit_log
+  Immutable audit trail
+  for security compliance.
+  Retention: 7 years (SOC2)
+end note
+
+@enduml

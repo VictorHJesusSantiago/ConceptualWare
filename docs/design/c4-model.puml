@@ -1,0 +1,95 @@
+@startuml C4_ConceptualWare_System
+
+' Concept #24 — C4 Model (Context, Container, Component, Code)
+' C4 Model by Simon Brown: 4 levels of zoom for software architecture
+' Render with: plantuml c4-model.puml or https://plantuml.com
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title C4 Model — ConceptualWare Developer Intelligence Platform
+
+' ── Level 1: System Context ─────────────────────────────────────────────────
+' Shows: system, its users, and external systems it interacts with
+
+LAYOUT_WITH_LEGEND()
+
+Person(developer, "Software Developer", "Uses ConceptualWare to learn and practice software engineering concepts")
+Person(admin, "Platform Admin", "Manages platform, monitors metrics, configures concepts")
+
+System_Boundary(cw, "ConceptualWare") {
+    Container(frontend,  "React SPA",         "React 18, TypeScript, Vite",      "Single-page application — UI for all 30 concept categories")
+    Container(gateway,   "API Gateway",        "Node.js, TypeScript, Express",    "Rate limiting, auth, routing, WebSocket proxy")
+    Container(backend,   "Backend API",        "Java 21, Spring Boot 3.2",        "All concept implementations: 800+ algorithms, data structures, OS, security, ML")
+    Container(compiler,  "ConceptLang Engine", "Java 21",                         "Lexer → Parser → AST → Semantic Analysis → IR → Interpreter (REPL)")
+    ContainerDb(mongodb, "MongoDB",            "MongoDB 7.0",                     "Primary store: users, challenges, algorithm results, execution history")
+    ContainerDb(redis,   "Redis",              "Redis 7.2",                       "Cache, rate limiting, leaderboard, sessions, pub/sub")
+    ContainerDb(neo4j,   "Neo4j",             "Neo4j 5.17",                      "Graph: concept relationships, prerequisites, learning paths")
+    ContainerDb(influx,  "InfluxDB",           "InfluxDB 2.7",                    "Time-series: algorithm execution metrics, performance trends")
+}
+
+System_Ext(github,  "GitHub",          "OAuth2 authentication provider")
+System_Ext(smtp,    "Email Service",   "Transactional emails (verification, notifications)")
+System_Ext(grafana, "Grafana Cloud",   "Metrics visualization and alerting")
+System_Ext(sentry,  "Sentry",         "Error tracking and performance monitoring")
+
+Rel(developer, frontend, "Uses", "HTTPS")
+Rel(admin,     frontend, "Manages", "HTTPS")
+
+Rel(frontend, gateway,  "Calls",       "REST/WebSocket, HTTPS")
+Rel(gateway,  backend,  "Forwards to", "REST, HTTP")
+Rel(backend,  mongodb,  "Reads/Writes","TCP 27017")
+Rel(backend,  redis,    "Cache/Queue", "TCP 6379")
+Rel(backend,  neo4j,    "Graph queries","Bolt 7687")
+Rel(backend,  influx,   "Metrics",     "HTTP 8086")
+Rel(backend,  compiler, "Executes",    "Method calls")
+
+Rel(gateway, github, "OAuth2",  "HTTPS")
+Rel(backend, smtp,   "Sends email", "SMTP/TLS")
+Rel(backend, grafana,"Pushes metrics","HTTPS")
+Rel(backend, sentry, "Reports errors","HTTPS")
+
+@enduml
+
+' ── Level 2: Container Diagram (shown above) ─────────────────────────────────
+
+' ── Level 3: Component Diagram (Backend) ─────────────────────────────────────
+@startuml C4_Backend_Components
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title C4 Component Diagram — Backend (Java/Spring Boot)
+
+Container_Boundary(backend, "Backend API") {
+    Component(api,       "REST Controllers",      "Spring MVC",           "HTTP endpoints: /concepts, /challenges, /leaderboard, /users")
+    Component(ws,        "WebSocket Handler",     "Spring WebSocket",     "Real-time execution updates, algorithm visualizations")
+    Component(security,  "Security Layer",        "Spring Security, JWT", "Authentication, authorization, TOTP MFA, Zero Trust")
+    Component(ds,        "Data Structures",       "Java 21",             "Red-Black Tree, B-Tree, Skip List, KD-Tree, Treap, Splay Tree")
+    Component(algos,     "Algorithms",            "Java 21",             "Search, Sort, Compression, Cryptography, Consensus (Raft, Paxos)")
+    Component(compiler_pkg, "ConceptLang Compiler","Java 21 sealed types","Lexer, Parser, AST, SemanticAnalyzer, IRGenerator, Optimizer, Interpreter")
+    Component(ml_pkg,    "ML Algorithms",         "Java 21",             "Linear/Logistic Regression, Decision Tree, Random Forest, Neural Network, LSTM, Transformer")
+    Component(os_pkg,    "OS Concepts",           "Java 21, JVM",        "Process Scheduling, Memory Simulator, File System, Signal Handling")
+    Component(db_pkg,    "Database Concepts",     "H2, Spring Data",     "SQL DDL/DML/DCL, Window Functions, CTEs, MVCC, ETL")
+    Component(nosql_pkg, "NoSQL Concepts",        "Spring Data",         "Redis, MongoDB, Cassandra, Neo4j, InfluxDB operations")
+    Component(sec_pkg,   "Security Concepts",     "Java Security API",   "PBKDF2, TOTP, Zero Trust, Key Rotation, SBOM, XXE/SSRF prevention")
+    Component(cache,     "Cache Layer",           "Spring Cache, Redis", "@Cacheable, @CachePut, @CacheEvict with TTL management")
+    Component(sched,     "Scheduled Jobs",        "Spring @Scheduled",   "Key rotation, metrics export, challenge refresh")
+}
+
+ContainerDb(mongodb, "MongoDB", "MongoDB 7.0", "")
+ContainerDb(redis,   "Redis",   "Redis 7.2",   "")
+
+Rel(api, security, "Secured by")
+Rel(api, ds,    "Executes")
+Rel(api, algos, "Executes")
+Rel(api, compiler_pkg, "Runs")
+Rel(api, ml_pkg, "Runs")
+Rel(api, os_pkg, "Runs")
+Rel(api, db_pkg, "Demonstrates")
+Rel(api, nosql_pkg, "Demonstrates")
+Rel(api, sec_pkg, "Demonstrates")
+Rel(api, cache, "Uses")
+Rel(db_pkg, mongodb, "Stores")
+Rel(cache, redis, "Caches in")
+Rel(sched, sec_pkg, "Triggers key rotation")
+
+@enduml

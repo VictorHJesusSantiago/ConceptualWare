@@ -1,0 +1,256 @@
+@startuml DFD_ConceptualWare
+
+' Concept #24 — Data Flow Diagram (DFD)
+' Shows: data flows between processes, data stores, and external entities
+' Level 0 (Context diagram) and Level 1 (main processes)
+
+title DFD — Level 0: Context Diagram
+
+rectangle "Developer\n(External Entity)" as user #LightBlue
+rectangle "GitHub OAuth\n(External Entity)" as github #LightGray
+rectangle "Email Service\n(External Entity)" as email #LightGray
+
+rectangle "ConceptualWare\nSystem" as system #LightYellow
+
+user --> system : concept selection, code submission, execution requests
+system --> user : algorithm results, learning progress, leaderboard scores
+
+user --> github : OAuth2 authorization request
+github --> system : user identity + access token
+
+system --> email : verification emails, notifications
+email --> user : email messages
+
+@enduml
+
+@startuml DFD_Level1
+
+' DFD Level 1 — Main Processes
+title DFD — Level 1: Main Processes
+
+' External entities
+rectangle "Developer" as dev  #LightBlue
+rectangle "Admin"     as admin #LightBlue
+
+' Processes (circles/bubbles)
+circle "1.0\nAuthenticate\nUser" as P1
+circle "2.0\nManage\nConcepts" as P2
+circle "3.0\nExecute\nAlgorithm" as P3
+circle "4.0\nGrade\nChallenge" as P4
+circle "5.0\nUpdate\nLeaderboard" as P5
+circle "6.0\nGenerate\nMetrics" as P6
+
+' Data stores
+database "D1: Users" as D1
+database "D2: Concepts" as D2
+database "D3: Submissions" as D3
+database "D4: Results Cache\n(Redis)" as D4
+database "D5: Metrics\n(InfluxDB)" as D5
+database "D6: Leaderboard\n(Redis ZSET)" as D6
+
+' Data flows
+dev   --> P1 : credentials, OAuth token
+P1    --> D1 : user record create/update
+P1    --> dev : JWT token, session
+
+dev   --> P2 : concept browse/search request
+P2    --> D2 : query concepts
+D2    --> P2 : concept data
+P2    --> dev : concept list, details, theory
+
+dev   --> P3 : algorithm input + parameters
+P3    --> D4 : check cache
+D4    --> P3 : cached result (hit)
+P3    --> D2 : fetch concept implementation
+P3    --> D3 : store execution result
+P3    --> D5 : publish metrics
+P3    --> D4 : cache result (miss)
+P3    --> dev : execution result + visualization
+
+dev   --> P4 : challenge submission (code)
+P4    --> D2 : fetch test cases
+P4    --> D3 : store submission
+P4    --> P5 : trigger score update
+P4    --> dev : grade result, feedback, hints
+
+P5    --> D6 : update score
+P5    --> D1 : update user progress
+P5    --> dev : new rank notification
+
+P6    --> D5 : query metrics
+P6    --> admin : analytics dashboard, alerts
+
+@enduml
+
+' ═════════════════════════════════════════════════════════════════════════════
+
+@startuml BPMN_AlgorithmExecution
+
+' Concept #24 — BPMN (Business Process Model and Notation)
+' BPMN 2.0 notation for algorithm execution workflow
+' Swimlanes show which participant is responsible for each activity
+
+title BPMN — Algorithm Execution Process
+
+|Developer|
+start
+
+:Open concept page;
+:Select algorithm variant;
+:Configure input parameters;
+:Click "Execute";
+
+|API Gateway|
+
+:Receive execution request;
+
+if (Rate limit exceeded?) then (yes)
+    :Return 429 Too Many Requests;
+    stop
+else (no)
+endif
+
+:Validate JWT token;
+
+if (Token valid?) then (no)
+    :Return 401 Unauthorized;
+    stop
+else (yes)
+endif
+
+:Forward request to backend;
+
+|Backend|
+
+:Check Redis cache;
+
+if (Cache hit?) then (yes)
+    :Return cached result;
+    |Developer|
+    :Display result from cache;
+    stop
+else (no)
+endif
+
+:Create isolated execution context;
+:Apply resource limits (CPU, memory, timeout);
+
+fork
+    :Execute algorithm;
+    :Record execution steps;
+fork again
+    :Start timeout watchdog (5s);
+end fork
+
+if (Execution timed out?) then (yes)
+    :Kill execution thread;
+    :Return TLE error;
+    |Developer|
+    :Show "Time Limit Exceeded";
+    stop
+else (no)
+endif
+
+if (Runtime error?) then (yes)
+    :Capture error and stack trace;
+    :Return error details;
+    |Developer|
+    :Show error message;
+    stop
+else (no)
+endif
+
+:Validate result correctness;
+:Format execution result;
+
+|Redis|
+:Cache result (TTL 5 min);
+
+|InfluxDB|
+:Write execution metrics\n(timing, memory, correctness);
+
+|Backend|
+:Return result to gateway;
+
+|API Gateway|
+:Forward result to client;
+
+|Developer|
+:View execution result;
+:See step-by-step visualization;
+:Review time/space complexity;
+
+if (Submit as challenge solution?) then (yes)
+    |Backend|
+    :Grade against test cases;
+    :Compute score;
+    :Update leaderboard;
+    |Developer|
+    :View grade and feedback;
+endif
+
+stop
+
+@enduml
+
+@startuml EventStorming
+
+' Concept #24 — Event Storming Board
+' Event Storming: collaborative technique to explore domain events
+' Orange: Domain Events (past tense)
+' Blue: Commands (triggers events)
+' Yellow: Aggregates (consistency boundaries)
+' Green: Policies (when event X, then command Y)
+' Purple: External Systems
+
+title Event Storming — ConceptualWare Domain
+
+' User Registration Flow
+rectangle "Register User" as CMD_REG #LightBlue
+rectangle "UserRegistered" as EVT_REG #Orange
+rectangle "Send Verification Email" as CMD_EMAIL #LightBlue
+rectangle "EmailVerificationSent" as EVT_EMAIL #Orange
+
+CMD_REG --> EVT_REG
+EVT_REG --> CMD_EMAIL : Policy: on UserRegistered
+CMD_EMAIL --> EVT_EMAIL
+
+' Concept Execution Flow
+rectangle "SelectConcept" as CMD_SEL #LightBlue
+rectangle "ConceptSelected" as EVT_SEL #Orange
+rectangle "ExecuteAlgorithm" as CMD_EXEC #LightBlue
+rectangle "AlgorithmExecuted" as EVT_EXEC #Orange
+rectangle "UpdateProgress" as CMD_PROG #LightBlue
+rectangle "ProgressUpdated" as EVT_PROG #Orange
+rectangle "UpdateLeaderboard" as CMD_LB #LightBlue
+rectangle "LeaderboardUpdated" as EVT_LB #Orange
+
+CMD_SEL --> EVT_SEL
+EVT_SEL --> CMD_EXEC
+CMD_EXEC --> EVT_EXEC
+EVT_EXEC --> CMD_PROG : Policy: on successful execution
+EVT_EXEC --> CMD_LB : Policy: on correct result
+CMD_PROG --> EVT_PROG
+CMD_LB --> EVT_LB
+
+' Challenge Submission Flow
+rectangle "SubmitSolution" as CMD_SUB #LightBlue
+rectangle "SolutionSubmitted" as EVT_SUB #Orange
+rectangle "GradeSubmission" as CMD_GRADE #LightBlue
+rectangle "SubmissionGraded" as EVT_GRADE #Orange
+rectangle "AwardBadge" as CMD_BADGE #LightBlue
+rectangle "BadgeAwarded" as EVT_BADGE #Orange
+
+CMD_SUB --> EVT_SUB
+EVT_SUB --> CMD_GRADE : Policy: immediately
+CMD_GRADE --> EVT_GRADE
+EVT_GRADE --> CMD_BADGE : Policy: if score = 100 and first time
+CMD_BADGE --> EVT_BADGE
+
+note top of EVT_EXEC
+  Domain Events captured in
+  MongoDB audit collection
+  and InfluxDB for metrics
+end note
+
+@enduml
