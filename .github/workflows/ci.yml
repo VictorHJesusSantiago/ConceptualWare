@@ -200,11 +200,84 @@ jobs:
     if: github.ref == 'refs/heads/main'
     environment: production
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.29.0'
+
+      - name: Configure Kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG_BASE64 }}" | base64 -d > $HOME/.kube/config
+
+      # ── Canary: 10% do tráfego ───────────────────────────────────────────────
       - name: Deploy Canary (10% traffic)
-        run: echo "Canary deployment — 10% traffic shifted"
+        run: |
+          # Atualiza a imagem do canary para o SHA do commit atual
+          kubectl -n conceptualware set image deployment/backend-canary \
+            backend=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend:${{ github.sha }}
+          kubectl -n conceptualware set image deployment/gateway-canary \
+            gateway=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/gateway:${{ github.sha }}
+          kubectl -n conceptualware set image deployment/frontend-canary \
+            frontend=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:${{ github.sha }}
 
+          # Aguarda rollout do canary
+          kubectl -n conceptualware rollout status deployment/backend-canary  --timeout=120s
+          kubectl -n conceptualware rollout status deployment/gateway-canary  --timeout=120s
+          kubectl -n conceptualware rollout status deployment/frontend-canary --timeout=120s
+
+      # ── Monitoramento do canary: verifica error rate por 5 min ───────────────
       - name: Monitor Canary (5 min error budget check)
-        run: echo "Monitoring canary deployment metrics..."
+        run: |
+          END=$(($(date +%s) + 300))
+          while [ $(date +%s) -lt $END ]; do
+            # Consulta Prometheus para taxa de erros 5xx do canary
+            ERROR_RATE=$(curl -sf \
+              --data-urlencode 'query=sum(rate(http_server_requests_seconds_count{status=~"5..",deployment="canary"}[1m])) / sum(rate(http_server_requests_seconds_count{deployment="canary"}[1m]))' \
+              "${{ secrets.PROMETHEUS_URL }}/api/v1/query" \
+              | jq -r '.data.result[0].value[1] // "0"')
 
+            echo "Canary error rate: ${ERROR_RATE}"
+
+            # Aborta se error rate > 1%
+            if (( $(echo "$ERROR_RATE > 0.01" | bc -l) )); then
+              echo "ERROR: canary error rate ${ERROR_RATE} exceeded 1% threshold — rolling back"
+              kubectl -n conceptualware rollout undo deployment/backend-canary
+              kubectl -n conceptualware rollout undo deployment/gateway-canary
+              kubectl -n conceptualware rollout undo deployment/frontend-canary
+              exit 1
+            fi
+
+            sleep 30
+          done
+          echo "Canary healthy — promoting to production"
+
+      # ── Promoção: atualiza o deployment estável ───────────────────────────────
       - name: Promote to Full Production
-        run: echo "Promoting canary to 100% traffic"
+        run: |
+          kubectl -n conceptualware set image deployment/backend \
+            backend=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend:${{ github.sha }}
+          kubectl -n conceptualware set image deployment/gateway \
+            gateway=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/gateway:${{ github.sha }}
+          kubectl -n conceptualware set image deployment/frontend \
+            frontend=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:${{ github.sha }}
+
+          kubectl -n conceptualware rollout status deployment/backend  --timeout=300s
+          kubectl -n conceptualware rollout status deployment/gateway  --timeout=300s
+          kubectl -n conceptualware rollout status deployment/frontend --timeout=300s
+
+          echo "Deployment ${{ github.sha }} promoted to production"
+
+      # ── Rollback automático em caso de falha ──────────────────────────────────
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Deployment failed — rolling back production to previous version"
+          kubectl -n conceptualware rollout undo deployment/backend
+          kubectl -n conceptualware rollout undo deployment/gateway
+          kubectl -n conceptualware rollout undo deployment/frontend
+          kubectl -n conceptualware rollout status deployment/backend  --timeout=120s
+          kubectl -n conceptualware rollout status deployment/gateway  --timeout=120s
+          kubectl -n conceptualware rollout status deployment/frontend --timeout=120s

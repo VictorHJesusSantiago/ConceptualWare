@@ -6,6 +6,19 @@ spring:
     mongodb:
       uri: ${SPRING_DATA_MONGODB_URI:mongodb://admin:secret@localhost:27017/conceptualware?authSource=admin}
       auto-index-creation: true
+    # Redis — Key-Value Store (Concept #11).
+    # NOTE: must live under the SAME `spring.data` key as mongodb. A second
+    # top-level `spring.data` block silently overrode this one (last key wins),
+    # which dropped the mongodb config at runtime.
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 2
 
   cache:
     type: simple
@@ -30,18 +43,6 @@ spring:
     multipart:
       max-file-size: 10MB
       max-request-size: 10MB
-
-  # Redis — Key-Value Store (Concept #11)
-  data:
-    redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      timeout: 2000ms
-      lettuce:
-        pool:
-          max-active: 8
-          max-idle: 8
-          min-idle: 2
 
   # H2 embedded SQL database (Concept #11: DDL/DML/JOINs/CTEs/Window Functions/MVCC)
   datasource:
@@ -79,7 +80,8 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus,loggers,env
+        # `env` removed — /actuator/env leaks configuration & secret material.
+        include: health,info,metrics,prometheus,loggers
   endpoint:
     health:
       show-details: always
@@ -155,6 +157,22 @@ spring:
   data:
     mongodb:
       uri: ${SPRING_DATA_MONGODB_URI}
+  # Secure by Default: H2 dev console must never be reachable in production.
+  h2:
+    console:
+      enabled: false
+
+server:
+  error:
+    # Do not leak exception messages / binding details to clients in prod.
+    include-message: never
+    include-binding-errors: never
+
+# Fail fast & fail securely: refuse to start in prod without a real JWT secret
+# instead of silently falling back to the well-known dev default.
+app:
+  jwt:
+    secret: ${JWT_SECRET}
 
 logging:
   level:
