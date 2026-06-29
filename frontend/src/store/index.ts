@@ -1,8 +1,14 @@
 import { create } from 'zustand';
-import { persist, subscribeWithSelector } from 'zustand/middleware';
+import { persist, subscribeWithSelector, createJSONStorage } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { User, AuthTokens, Algorithm } from '../types/index.js';
 import { authApi } from '../services/api.js';
+
+// ADR-004: access token fica apenas em memória (não persistido).
+// Refresh token vai em sessionStorage — persiste no recarregamento da aba,
+// mas não é legível por scripts de outras abas nem por ataques cross-origin.
+// Ver docs/adr/ADR-004-auth-token-storage.md para target state (HttpOnly cookie).
+const SESSION_REFRESH_KEY = 'cw_rt';
 
 /**
  * Concept #6  — Paradigma orientado a eventos, Reativo
@@ -27,80 +33,111 @@ interface AuthActions {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  silentRefresh: () => Promise<boolean>;
   clearError: () => void;
 }
 
+// Helper que persiste o refresh token em sessionStorage (não localStorage).
+// Access token nunca é serializado — permanece apenas na memória do processo.
+function storeTokens(accessToken: string, refreshToken: string) {
+  sessionStorage.setItem(SESSION_REFRESH_KEY, refreshToken);
+  return { accessToken, refreshToken };
+}
+
+function clearStoredTokens() {
+  sessionStorage.removeItem(SESSION_REFRESH_KEY);
+}
+
 export const useAuthStore = create<AuthState & AuthActions>()(
-  persist(
-    subscribeWithSelector(
-      immer((set, get) => ({
-        // Initial state
-        user: null,
-        accessToken: null,
-        refreshToken: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: null,
+  subscribeWithSelector(
+    immer((set, get) => ({
+      // Estado inicial — tokens nunca vêm do localStorage
+      user: null,
+      accessToken: null,
+      // Lê o refresh token do sessionStorage na inicialização da store
+      refreshToken: sessionStorage.getItem(SESSION_REFRESH_KEY) ?? null,
+      isAuthenticated: !!sessionStorage.getItem(SESSION_REFRESH_KEY),
+      isLoading: false,
+      error: null,
 
-        // Commands (CQRS — Concept #12)
-        login: async (email, password) => {
-          set(state => { state.isLoading = true; state.error = null; });
-          try {
-            const tokens: AuthTokens = await authApi.login(email, password);
-            set(state => {
-              state.accessToken = tokens.accessToken;
-              state.refreshToken = tokens.refreshToken;
-              state.isAuthenticated = true;
-              state.isLoading = false;
-            });
-          } catch (e: unknown) {
-            const message = e instanceof Error ? e.message : 'Login failed';
-            set(state => { state.error = message; state.isLoading = false; });
-            throw e;
-          }
-        },
-
-        register: async (email, username, password) => {
-          set(state => { state.isLoading = true; state.error = null; });
-          try {
-            const tokens: AuthTokens = await authApi.register(email, username, password);
-            set(state => {
-              state.accessToken = tokens.accessToken;
-              state.refreshToken = tokens.refreshToken;
-              state.isAuthenticated = true;
-              state.isLoading = false;
-            });
-          } catch (e: unknown) {
-            const message = e instanceof Error ? e.message : 'Registration failed';
-            set(state => { state.error = message; state.isLoading = false; });
-            throw e;
-          }
-        },
-
-        logout: async () => {
-          const { refreshToken } = get();
-          if (refreshToken) {
-            try { await authApi.logout(refreshToken); } catch { /* ignore */ }
-          }
+      // Commands (CQRS — Concept #12)
+      login: async (email, password) => {
+        set(state => { state.isLoading = true; state.error = null; });
+        try {
+          const tokens: AuthTokens = await authApi.login(email, password);
+          storeTokens(tokens.accessToken, tokens.refreshToken);
           set(state => {
-            state.user = null;
+            state.accessToken = tokens.accessToken;
+            state.refreshToken = tokens.refreshToken;
+            state.isAuthenticated = true;
+            state.isLoading = false;
+          });
+        } catch (e: unknown) {
+          const message = e instanceof Error ? e.message : 'Login failed';
+          set(state => { state.error = message; state.isLoading = false; });
+          throw e;
+        }
+      },
+
+      register: async (email, username, password) => {
+        set(state => { state.isLoading = true; state.error = null; });
+        try {
+          const tokens: AuthTokens = await authApi.register(email, username, password);
+          storeTokens(tokens.accessToken, tokens.refreshToken);
+          set(state => {
+            state.accessToken = tokens.accessToken;
+            state.refreshToken = tokens.refreshToken;
+            state.isAuthenticated = true;
+            state.isLoading = false;
+          });
+        } catch (e: unknown) {
+          const message = e instanceof Error ? e.message : 'Registration failed';
+          set(state => { state.error = message; state.isLoading = false; });
+          throw e;
+        }
+      },
+
+      // Renovação silenciosa: disparada no mount do App quando há refresh token
+      // em sessionStorage mas nenhum access token em memória (ex: recarregamento).
+      silentRefresh: async () => {
+        const { refreshToken } = get();
+        if (!refreshToken) return false;
+        try {
+          const tokens: AuthTokens = await authApi.refresh(refreshToken);
+          storeTokens(tokens.accessToken, tokens.refreshToken);
+          set(state => {
+            state.accessToken = tokens.accessToken;
+            state.refreshToken = tokens.refreshToken;
+            state.isAuthenticated = true;
+          });
+          return true;
+        } catch {
+          clearStoredTokens();
+          set(state => {
             state.accessToken = null;
             state.refreshToken = null;
             state.isAuthenticated = false;
           });
-        },
+          return false;
+        }
+      },
 
-        clearError: () => set(state => { state.error = null; }),
-      }))
-    ),
-    {
-      name: 'conceptualware-auth',
-      partialize: (state) => ({
-        accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
-        isAuthenticated: state.isAuthenticated,
-      }),
-    }
+      logout: async () => {
+        const { refreshToken } = get();
+        if (refreshToken) {
+          try { await authApi.logout(refreshToken); } catch { /* sempre limpa localmente */ }
+        }
+        clearStoredTokens();
+        set(state => {
+          state.user = null;
+          state.accessToken = null;
+          state.refreshToken = null;
+          state.isAuthenticated = false;
+        });
+      },
+
+      clearError: () => set(state => { state.error = null; }),
+    }))
   )
 );
 

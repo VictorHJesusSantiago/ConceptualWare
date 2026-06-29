@@ -11,8 +11,10 @@ import { Algorithm, AuthTokens, ExecutionResult, Paginated, User } from '../type
 
 // ── Axios Instance (Concept #14 — DRY, Singleton-like config) ────────────────
 
+// VITE_API_BASE_URL definido em .env (ver .env.example).
+// Não use VITE_API_URL — nome divergente do .env.example causava fallback silencioso.
 const api: AxiosInstance = axios.create({
-  baseURL: import.meta.env['VITE_API_URL'] ?? 'http://localhost:3001',
+  baseURL: import.meta.env['VITE_API_BASE_URL'] ?? 'http://localhost:3001',
   timeout: 15_000,
   headers: {
     'Content-Type': 'application/json',
@@ -21,9 +23,13 @@ const api: AxiosInstance = axios.create({
 });
 
 // ── Request interceptor — attach JWT (Concept #21) ────────────────────────────
+// ADR-004: token lido da store em memória, nunca do localStorage.
 
 api.interceptors.request.use(config => {
-  const token = localStorage.getItem('accessToken');
+  // Importação dinâmica da store evita ciclo de dependência (api ← store ← api).
+  // A store é inicializada antes da primeira requisição autenticada.
+  const { useAuthStore } = require('../store/index.js') as typeof import('../store/index.js');
+  const token = useAuthStore.getState().accessToken;
   if (token) config.headers['Authorization'] = `Bearer ${token}`;
   config.headers['X-Request-ID'] = crypto.randomUUID().slice(0, 8);
   return config;
@@ -53,12 +59,16 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const refreshToken = localStorage.getItem('refreshToken');
+        const { useAuthStore } = require('../store/index.js') as typeof import('../store/index.js');
+        const store = useAuthStore.getState();
+        const refreshToken = store.refreshToken;
         if (!refreshToken) throw new Error('No refresh token');
 
         const { data } = await api.post<AuthTokens>('/api/v1/auth/refresh', { refreshToken });
-        localStorage.setItem('accessToken', data.accessToken);
-        localStorage.setItem('refreshToken', data.refreshToken);
+
+        // Atualiza store em memória + sessionStorage via ação da própria store
+        sessionStorage.setItem('cw_rt', data.refreshToken);
+        useAuthStore.setState({ accessToken: data.accessToken, refreshToken: data.refreshToken, isAuthenticated: true });
 
         pendingQueue.forEach(({ resolve }) => resolve(data.accessToken));
         pendingQueue = [];
@@ -66,8 +76,9 @@ api.interceptors.response.use(
       } catch (refreshError) {
         pendingQueue.forEach(({ reject }) => reject(refreshError));
         pendingQueue = [];
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
+        sessionStorage.removeItem('cw_rt');
+        const { useAuthStore } = require('../store/index.js') as typeof import('../store/index.js');
+        useAuthStore.setState({ accessToken: null, refreshToken: null, isAuthenticated: false });
         window.location.href = '/login';
         return Promise.reject(refreshError);
       } finally {

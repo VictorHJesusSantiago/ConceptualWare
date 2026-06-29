@@ -17,7 +17,16 @@ declare global {
   }
 }
 
-const JWT_SECRET = process.env['JWT_SECRET'] ?? 'dev-secret-change-in-production';
+// Fail fast & fail securely: a known fallback secret lets anyone forge tokens the
+// gateway will accept, so only permit the dev default outside production.
+const JWT_SECRET = (() => {
+  const secret = process.env['JWT_SECRET'];
+  if (secret) return secret;
+  if (process.env['NODE_ENV'] === 'production') {
+    throw new Error('JWT_SECRET must be set in production');
+  }
+  return 'dev-secret-change-in-production';
+})();
 
 // ── Pure token validation function ────────────────────────────────────────────
 
