@@ -1,14 +1,8 @@
 import { create } from 'zustand';
-import { persist, subscribeWithSelector, createJSONStorage } from 'zustand/middleware';
+import { persist, subscribeWithSelector } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { User, AuthTokens, Algorithm } from '../types/index.js';
-import { authApi } from '../services/api.js';
-
-// ADR-004: access token fica apenas em memória (não persistido).
-// Refresh token vai em sessionStorage — persiste no recarregamento da aba,
-// mas não é legível por scripts de outras abas nem por ataques cross-origin.
-// Ver docs/adr/ADR-004-auth-token-storage.md para target state (HttpOnly cookie).
-const SESSION_REFRESH_KEY = 'cw_rt';
+import { authApi, registerTokenSource } from '../services/api.js';
 
 /**
  * Concept #6  — Paradigma orientado a eventos, Reativo
@@ -19,6 +13,13 @@ const SESSION_REFRESH_KEY = 'cw_rt';
  */
 
 // ── Auth State ────────────────────────────────────────────────────────────────
+//
+// ADR-004: access token fica apenas em memória (não persistido).
+// Refresh token vai em sessionStorage — persiste no recarregamento da aba,
+// mas não é legível por scripts de outras abas nem por ataques cross-origin.
+// Ver docs/adr/ADR-004-auth-token-storage.md para target state (HttpOnly cookie).
+
+const SESSION_REFRESH_KEY = 'cw_rt';
 
 interface AuthState {
   user: User | null;
@@ -33,28 +34,27 @@ interface AuthActions {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** Chama no mount do App para restaurar sessão após recarregamento da página. */
   silentRefresh: () => Promise<boolean>;
   clearError: () => void;
 }
 
-// Helper que persiste o refresh token em sessionStorage (não localStorage).
-// Access token nunca é serializado — permanece apenas na memória do processo.
-function storeTokens(accessToken: string, refreshToken: string) {
+function persistTokens(accessToken: string, refreshToken: string) {
   sessionStorage.setItem(SESSION_REFRESH_KEY, refreshToken);
   return { accessToken, refreshToken };
 }
 
-function clearStoredTokens() {
+function clearPersistedTokens() {
   sessionStorage.removeItem(SESSION_REFRESH_KEY);
 }
 
 export const useAuthStore = create<AuthState & AuthActions>()(
   subscribeWithSelector(
     immer((set, get) => ({
-      // Estado inicial — tokens nunca vêm do localStorage
+      // Estado inicial — access token nunca vem de storage
       user: null,
       accessToken: null,
-      // Lê o refresh token do sessionStorage na inicialização da store
+      // Lê o refresh token do sessionStorage na inicialização (sobrevive reload)
       refreshToken: sessionStorage.getItem(SESSION_REFRESH_KEY) ?? null,
       isAuthenticated: !!sessionStorage.getItem(SESSION_REFRESH_KEY),
       isLoading: false,
@@ -65,7 +65,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         set(state => { state.isLoading = true; state.error = null; });
         try {
           const tokens: AuthTokens = await authApi.login(email, password);
-          storeTokens(tokens.accessToken, tokens.refreshToken);
+          persistTokens(tokens.accessToken, tokens.refreshToken);
           set(state => {
             state.accessToken = tokens.accessToken;
             state.refreshToken = tokens.refreshToken;
@@ -83,7 +83,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         set(state => { state.isLoading = true; state.error = null; });
         try {
           const tokens: AuthTokens = await authApi.register(email, username, password);
-          storeTokens(tokens.accessToken, tokens.refreshToken);
+          persistTokens(tokens.accessToken, tokens.refreshToken);
           set(state => {
             state.accessToken = tokens.accessToken;
             state.refreshToken = tokens.refreshToken;
@@ -97,14 +97,14 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         }
       },
 
-      // Renovação silenciosa: disparada no mount do App quando há refresh token
-      // em sessionStorage mas nenhum access token em memória (ex: recarregamento).
+      // Renovação silenciosa: disparada no mount do App quando há refresh token em
+      // sessionStorage mas nenhum access token em memória (ex: reload da página).
       silentRefresh: async () => {
         const { refreshToken } = get();
         if (!refreshToken) return false;
         try {
           const tokens: AuthTokens = await authApi.refresh(refreshToken);
-          storeTokens(tokens.accessToken, tokens.refreshToken);
+          persistTokens(tokens.accessToken, tokens.refreshToken);
           set(state => {
             state.accessToken = tokens.accessToken;
             state.refreshToken = tokens.refreshToken;
@@ -112,7 +112,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           });
           return true;
         } catch {
-          clearStoredTokens();
+          clearPersistedTokens();
           set(state => {
             state.accessToken = null;
             state.refreshToken = null;
@@ -127,7 +127,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         if (refreshToken) {
           try { await authApi.logout(refreshToken); } catch { /* sempre limpa localmente */ }
         }
-        clearStoredTokens();
+        clearPersistedTokens();
         set(state => {
           state.user = null;
           state.accessToken = null;
@@ -139,6 +139,26 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       clearError: () => set(state => { state.error = null; }),
     }))
   )
+);
+
+// ── Registra a store como fonte de token para o axios (quebra o ciclo) ────────
+// Chamado uma vez após a criação da store, antes de qualquer requisição.
+registerTokenSource(
+  // getter do access token (memória)
+  () => useAuthStore.getState().accessToken,
+  // getter do refresh token (sessionStorage via store)
+  () => useAuthStore.getState().refreshToken,
+  // callback quando o interceptor renova os tokens com sucesso
+  (accessToken, refreshToken) => {
+    persistTokens(accessToken, refreshToken);
+    useAuthStore.setState({ accessToken, refreshToken, isAuthenticated: true });
+  },
+  // callback quando a sessão expira definitivamente
+  () => {
+    clearPersistedTokens();
+    useAuthStore.setState({ accessToken: null, refreshToken: null, isAuthenticated: false, user: null });
+    window.location.href = '/login';
+  },
 );
 
 // ── Algorithm Explorer State ──────────────────────────────────────────────────
@@ -199,7 +219,7 @@ export const useAlgorithmStore = create<AlgorithmState & AlgorithmActions>()(
       addToRecentlyViewed: (slug) => set(state => {
         state.recentlyViewed = [
           slug,
-          ...state.recentlyViewed.filter(s => s !== slug).slice(0, 9)
+          ...state.recentlyViewed.filter(s => s !== slug).slice(0, 9),
         ];
       }),
     })),

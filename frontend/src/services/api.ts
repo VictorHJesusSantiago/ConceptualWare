@@ -22,20 +22,43 @@ const api: AxiosInstance = axios.create({
   },
 });
 
+// ── Token source injection (quebra o ciclo api ↔ store) ───────────────────────
+//
+// ADR-004: access token fica apenas em memória (na store Zustand), nunca em
+// localStorage. api.ts não pode importar a store diretamente pois cria ciclo:
+//   api.ts → store/index.ts → services/api.ts
+//
+// Solução: padrão de injeção — a store se registra como fonte de token logo
+// após ser criada (ver store/index.ts: registerTokenSource / registerOnExpired).
+// Antes do registro, as callbacks são no-ops seguros.
+
+let _getAccessToken: () => string | null = () => null;
+let _getRefreshToken: () => string | null = () => null;
+let _onTokenRefreshed: (accessToken: string, refreshToken: string) => void = () => {};
+let _onSessionExpired: () => void = () => { window.location.href = '/login'; };
+
+export function registerTokenSource(
+  getAccess: () => string | null,
+  getRefresh: () => string | null,
+  onRefreshed: (access: string, refresh: string) => void,
+  onExpired: () => void,
+): void {
+  _getAccessToken   = getAccess;
+  _getRefreshToken  = getRefresh;
+  _onTokenRefreshed = onRefreshed;
+  _onSessionExpired = onExpired;
+}
+
 // ── Request interceptor — attach JWT (Concept #21) ────────────────────────────
-// ADR-004: token lido da store em memória, nunca do localStorage.
 
 api.interceptors.request.use(config => {
-  // Importação dinâmica da store evita ciclo de dependência (api ← store ← api).
-  // A store é inicializada antes da primeira requisição autenticada.
-  const { useAuthStore } = require('../store/index.js') as typeof import('../store/index.js');
-  const token = useAuthStore.getState().accessToken;
+  const token = _getAccessToken();
   if (token) config.headers['Authorization'] = `Bearer ${token}`;
   config.headers['X-Request-ID'] = crypto.randomUUID().slice(0, 8);
   return config;
 });
 
-// ── Response interceptor — token refresh (Concept #21) ────────────────────────
+// ── Response interceptor — silent refresh em 401 (Concept #21) ────────────────
 
 let isRefreshing = false;
 let pendingQueue: Array<{ resolve: (token: string) => void; reject: (e: unknown) => void }> = [];
@@ -47,7 +70,7 @@ api.interceptors.response.use(
 
     if (error.response?.status === 401 && !('_retry' in originalRequest)) {
       if (isRefreshing) {
-        return new Promise((resolve, reject) => {
+        return new Promise<string>((resolve, reject) => {
           pendingQueue.push({ resolve, reject });
         }).then(token => {
           originalRequest.headers['Authorization'] = `Bearer ${token}`;
@@ -59,27 +82,21 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const { useAuthStore } = require('../store/index.js') as typeof import('../store/index.js');
-        const store = useAuthStore.getState();
-        const refreshToken = store.refreshToken;
+        const refreshToken = _getRefreshToken();
         if (!refreshToken) throw new Error('No refresh token');
 
         const { data } = await api.post<AuthTokens>('/api/v1/auth/refresh', { refreshToken });
 
-        // Atualiza store em memória + sessionStorage via ação da própria store
-        sessionStorage.setItem('cw_rt', data.refreshToken);
-        useAuthStore.setState({ accessToken: data.accessToken, refreshToken: data.refreshToken, isAuthenticated: true });
+        _onTokenRefreshed(data.accessToken, data.refreshToken);
 
         pendingQueue.forEach(({ resolve }) => resolve(data.accessToken));
         pendingQueue = [];
+        originalRequest.headers['Authorization'] = `Bearer ${data.accessToken}`;
         return api(originalRequest);
       } catch (refreshError) {
         pendingQueue.forEach(({ reject }) => reject(refreshError));
         pendingQueue = [];
-        sessionStorage.removeItem('cw_rt');
-        const { useAuthStore } = require('../store/index.js') as typeof import('../store/index.js');
-        useAuthStore.setState({ accessToken: null, refreshToken: null, isAuthenticated: false });
-        window.location.href = '/login';
+        _onSessionExpired();
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

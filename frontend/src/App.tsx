@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './store/index.js';
@@ -55,6 +55,25 @@ function PageLoader(): React.ReactElement {
 }
 
 export default function App(): React.ReactElement {
+  // ADR-004: ao montar o App, se há refresh token em sessionStorage mas nenhum
+  // access token em memória (ex: reload da página), tenta renovação silenciosa.
+  // Enquanto a renovação está em curso, exibe o PageLoader para evitar redirect
+  // prematuro para /login de rotas protegidas.
+  const silentRefresh = useAuthStore(s => s.silentRefresh);
+  const accessToken   = useAuthStore(s => s.accessToken);
+  const refreshToken  = useAuthStore(s => s.refreshToken);
+  const [initializing, setInitializing] = useState(!!refreshToken && !accessToken);
+
+  useEffect(() => {
+    if (!refreshToken || accessToken) {
+      setInitializing(false);
+      return;
+    }
+    silentRefresh().finally(() => setInitializing(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (initializing) return <PageLoader />;
+
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
