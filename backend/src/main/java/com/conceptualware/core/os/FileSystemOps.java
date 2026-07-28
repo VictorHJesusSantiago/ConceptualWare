@@ -112,6 +112,28 @@ public class FileSystemOps {
         }
     }
 
+    // ── Path Traversal Protection — Concept #21 (OWASP A01: Broken Access Control) ──
+
+    /**
+     * Resolve um caminho fornecido pelo usuário (ex.: nome de arquivo de upload)
+     * contra um diretório base, rejeitando qualquer tentativa de escapar dele
+     * via ".." ou links simbólicos ("Zip Slip" / path traversal, OWASP A01).
+     *
+     * Estratégia: resolve o caminho relativo contra a base, normaliza (colapsa
+     * "..") e então verifica que o resultado ainda começa pela base — path
+     * traversal clássico tenta justamente burlar essa checagem sem normalização.
+     */
+    public static Path safeResolveFile(Path baseDir, String userSuppliedRelativePath) {
+        Path base = baseDir.toAbsolutePath().normalize();
+        Path resolved = base.resolve(userSuppliedRelativePath).normalize();
+
+        if (!resolved.startsWith(base)) {
+            throw new SecurityException(
+                "Path traversal detectado: '" + userSuppliedRelativePath + "' escapa do diretório base " + base);
+        }
+        return resolved;
+    }
+
     /** FileVisitor pattern — full control over traversal (preVisit, postVisit, error). */
     public static Map<String, Long> sizeByExtension(Path root) throws IOException {
         Map<String, Long> sizes = new TreeMap<>();
