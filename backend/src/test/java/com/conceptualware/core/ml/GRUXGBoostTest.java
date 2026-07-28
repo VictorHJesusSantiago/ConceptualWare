@@ -68,8 +68,7 @@ class GRUXGBoostTest {
             double[][] seq = new double[seqLen][3];
             double[][] states = gru.forwardAllStates(seq);
 
-            assertThat(states).hasSize(seqLen);
-            for (double[] s : states) assertThat(s).hasSize(6);
+            assertThat(states).hasDimensions(seqLen, 6);
         }
 
         @Test @DisplayName("bidirectional GRU output is double the hidden size")

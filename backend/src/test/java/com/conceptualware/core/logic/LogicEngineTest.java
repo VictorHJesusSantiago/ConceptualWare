@@ -83,7 +83,9 @@ class LogicEngineTest {
             new String[]{"A"},
             vals -> engine.or(vals[0], engine.not(vals[0]))
         );
-        assertThat(engine.isTautology(table)).isTrue();
+        // evaluateAllCombinations retorna List<PropExpression>, não List<TruthTableRow>
+        // (isTautology/isContradiction operam sobre TruthTableRow) — checamos direto aqui.
+        assertThat(table.stream().allMatch(LogicEngine.PropExpression::result)).isTrue();
     }
 
     @Test
@@ -93,7 +95,7 @@ class LogicEngineTest {
             new String[]{"A"},
             vals -> engine.and(vals[0], engine.not(vals[0]))
         );
-        assertThat(engine.isContradiction(table)).isTrue();
+        assertThat(table.stream().noneMatch(LogicEngine.PropExpression::result)).isTrue();
     }
 
     // ── Quantifiers ────────────────────────────────────────────────────────────

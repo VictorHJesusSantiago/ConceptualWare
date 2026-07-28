@@ -270,7 +270,16 @@ class GenerativeAndRLTest {
         @Test @DisplayName("policy parameters updated after episode")
         void parametersUpdated() {
             var pg = new ReinforcementLearning.PolicyGradient(4, 2, 0.01, 0.99, 42L);
-            double[][] thetaBefore = pg.getTheta().clone();
+            // .clone() em double[][] é RASO — as linhas internas continuam sendo as
+            // mesmas referências. Como updateEpisode() muta theta[s][a] in-place,
+            // thetaBefore acabava apontando para os MESMOS arrays já mutados,
+            // fazendo a comparação abaixo nunca detectar diferença. Precisa de
+            // deep clone (linha por linha).
+            double[][] thetaOriginal = pg.getTheta();
+            double[][] thetaBefore = new double[thetaOriginal.length][];
+            for (int s = 0; s < thetaOriginal.length; s++) {
+                thetaBefore[s] = thetaOriginal[s].clone();
+            }
 
             pg.updateEpisode(
                 new int[]{0, 1, 2, 3},      // states

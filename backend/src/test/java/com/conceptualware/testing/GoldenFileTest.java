@@ -51,8 +51,8 @@ class GoldenFileTest {
 
         new TreeMap<>(table).forEach((name, info) ->
             sb.append(String.format("%-20s %-15s %-15s %-15s %-10s %-8s%n",
-                info.name(), info.best(), info.average(), info.worst(),
-                info.spaceComplexity(), info.stable()))
+                info.name(), info.timeBest(), info.timeAvg(), info.timeWorst(),
+                info.space(), info.stable()))
         );
         return sb.toString();
     }

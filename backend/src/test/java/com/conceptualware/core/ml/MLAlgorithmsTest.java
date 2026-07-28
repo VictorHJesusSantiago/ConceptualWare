@@ -246,7 +246,7 @@ class MLAlgorithmsTest {
         void kMeansPlusPlusInit() {
             var km = new UnsupervisedLearning.KMeans(3, 10, 42);
             km.fit(clusterData());
-            assertThat(km.centroids()).hasSize(3);
+            assertThat(km.centroids().length).isEqualTo(3);
         }
 
         @Test @DisplayName("silhouette score between -1 and 1")
@@ -302,8 +302,7 @@ class MLAlgorithmsTest {
 
             var pca = new UnsupervisedLearning.PCA();
             double[][] reduced = pca.fitTransform(X, 2); // reduce to 2D
-            assertThat(reduced).hasSize(50);
-            assertThat(reduced[0]).hasSize(2);
+            assertThat(reduced).hasDimensions(50, 2);
         }
 
         @Test @DisplayName("explained variance ratios sum to ≤ 1")
@@ -384,16 +383,14 @@ class MLAlgorithmsTest {
             var conv = new NeuralNetwork.Conv2D(kernel, 0.0);
             double[][] output = conv.forward(input);
             // valid conv: (8-3+1) x (8-3+1) = 6x6
-            assertThat(output).hasSize(6);
-            assertThat(output[0]).hasSize(6);
+            assertThat(output).hasDimensions(6, 6);
         }
 
         @Test @DisplayName("MaxPool reduces spatial dimensions")
         void maxPooling() {
             double[][] input = {{1,2,3,4},{5,6,7,8},{9,10,11,12},{13,14,15,16}};
             double[][] pooled = NeuralNetwork.Conv2D.maxPool(input, 2, 2);
-            assertThat(pooled).hasSize(2);
-            assertThat(pooled[0]).hasSize(2);
+            assertThat(pooled).hasDimensions(2, 2);
             assertThat(pooled[0][0]).isEqualTo(6.0); // max of [[1,2],[5,6]]
         }
 
@@ -421,8 +418,7 @@ class MLAlgorithmsTest {
             double[][] V = randomMatrix(seqLen, dk);
 
             double[][] output = TransformerAttention.scaledDotProductAttention(Q, K, V);
-            assertThat(output).hasSize(seqLen);
-            assertThat(output[0]).hasSize(dk);
+            assertThat(output).hasDimensions(seqLen, dk);
         }
 
         @Test @DisplayName("attention weights sum to 1 per row (softmax)")
@@ -440,8 +436,7 @@ class MLAlgorithmsTest {
         @Test @DisplayName("positional encoding has correct shape")
         void positionalEncodingShape() {
             double[][] PE = TransformerAttention.positionalEncoding(100, 64);
-            assertThat(PE).hasSize(100);
-            assertThat(PE[0]).hasSize(64);
+            assertThat(PE).hasDimensions(100, 64);
         }
 
         @Test @DisplayName("positional encoding values in [-1, 1]")
@@ -493,7 +488,7 @@ class MLAlgorithmsTest {
             int[] actual    = {0, 0, 1, 1, 2, 2};
             int[] predicted = {0, 1, 0, 1, 2, 2};
             int[][] cm = ModelEvaluator.confusionMatrix(actual, predicted, 3);
-            assertThat(cm).hasSize(3);
+            assertThat(cm.length).isEqualTo(3);
             int total = 0;
             for (int[] row : cm) for (int v : row) total += v;
             assertThat(total).isEqualTo(6);

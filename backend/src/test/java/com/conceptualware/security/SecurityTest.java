@@ -334,9 +334,10 @@ class SecurityTest {
         @DisplayName("KeyRotationService signs and verifies token")
         void keyRotationServiceSignVerify() {
             KeyRotationService svc = new KeyRotationService();
-            io.jsonwebtoken.Claims claims = Jwts.claims();
-            claims.setSubject("user-123");
-            claims.setExpiration(Date.from(Instant.now().plusSeconds(300)));
+            io.jsonwebtoken.Claims claims = Jwts.claims()
+                .subject("user-123")
+                .expiration(Date.from(Instant.now().plusSeconds(300)))
+                .build();
             String token = svc.sign(claims);
             io.jsonwebtoken.Claims verified = svc.verify(token);
             assertThat(verified.getSubject()).isEqualTo("user-123");

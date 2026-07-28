@@ -6,7 +6,9 @@ import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
 import io.opentelemetry.context.Context;
+import io.opentelemetry.context.propagation.ContextPropagators;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.testing.exporter.InMemorySpanExporter;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
@@ -49,8 +51,13 @@ class OpenTelemetryServiceTest {
             .addSpanProcessor(SimpleSpanProcessor.create(spanExporter))
             .build();
 
+        // Propagador W3C precisa ser configurado explicitamente — sem isso, o
+        // ContextPropagators default é NO-OP e injectTraceContext/extractTraceContext
+        // silenciosamente não fazem nada (não lançam erro, só não propagam nada),
+        // gerando trace IDs aleatórios em vez de honrar o header 'traceparent'.
         otel = OpenTelemetrySdk.builder()
             .setTracerProvider(tracerProvider)
+            .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
             .buildAndRegisterGlobal();
 
         service = new OpenTelemetryService();
