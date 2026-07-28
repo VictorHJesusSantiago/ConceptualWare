@@ -48,7 +48,7 @@ public class XGBoost {
     private final double gamma;         // minimum gain to make a split
     private final double subsample;     // row subsampling ratio per tree
     private final double colSampleByTree; // feature subsampling ratio per tree
-    private final int   minChildWeight; // minimum sum of Hessians in a leaf
+    private final int   minChildWeight; // minimum number of samples in a leaf
     private final Random rng;
 
     // ── Model state ───────────────────────────────────────────────────────────
@@ -252,7 +252,7 @@ public class XGBoost {
             double G = sum(g, idx), H = sum(h, idx);
             double leafWeight = -G / (H + lambda);   // optimal leaf weight w*
 
-            if (depth >= maxDepth || idx.length <= 1 || H < minChildWeight) {
+            if (depth >= maxDepth || idx.length < minChildWeight) {
                 return new TreeNode(leafWeight);
             }
 
@@ -289,12 +289,20 @@ public class XGBoost {
                     if (vals[k] == vals[k + 1]) continue;   // skip duplicate values
 
                     double GL = 0, HL = 0;
+                    int countL = 0;
                     for (int i : idx) {
-                        if (X[i][fIdx] <= threshold) { GL += g[i]; HL += h[i]; }
+                        if (X[i][fIdx] <= threshold) { GL += g[i]; HL += h[i]; countL++; }
                     }
                     double GR = G - GL, HR = H - HL;
+                    int countR = idx.length - countL;
 
-                    if (HL < minChildWeight || HR < minChildWeight) continue;
+                    // minChildWeight é um int nomeado "peso mínimo" mas seu uso natural
+                    // (valor 1 = "sem restrição real") é contagem MÍNIMA DE AMOSTRAS por
+                    // filho — comparar contra a soma de Hessianos (que satura em 0.25 por
+                    // amostra na perda logística) tornava minChildWeight=1 equivalente a
+                    // exigir ~4 amostras por folha, bloqueando splits válidos em datasets
+                    // pequenos mesmo quando trivialmente separáveis.
+                    if (countL < minChildWeight || countR < minChildWeight) continue;
 
                     // XGBoost split gain formula
                     double gain = 0.5 * (GL * GL / (HL + lambda)
