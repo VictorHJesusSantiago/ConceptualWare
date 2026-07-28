@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './store/index.js';
+import ThemeToggle from './components/ThemeToggle.js';
 
 /**
  * Concept #6  — SPA, Event-Driven, Reativo (React)
@@ -20,6 +21,7 @@ const LoginPage         = lazy(() => import('./pages/LoginPage.js'));
 const RegisterPage      = lazy(() => import('./pages/RegisterPage.js'));
 const ProfilePage       = lazy(() => import('./pages/ProfilePage.js'));
 const ConceptMapPage    = lazy(() => import('./pages/ConceptMapPage.js'));
+const PlaygroundPage    = lazy(() => import('./pages/PlaygroundPage.js'));
 
 // React Query client — Concept #18 (async data fetching & caching)
 const queryClient = new QueryClient({
@@ -87,6 +89,7 @@ export default function App(): React.ReactElement {
             <Route path="/algorithms"        element={<AlgorithmExplorer />} />
             <Route path="/algorithms/:slug"  element={<AlgorithmDetail />} />
             <Route path="/concepts"          element={<ConceptMapPage />} />
+            <Route path="/playground"        element={<PlaygroundPage />} />
 
             {/* Protected routes */}
             <Route path="/" element={
@@ -102,6 +105,7 @@ export default function App(): React.ReactElement {
             <Route path="*" element={<Navigate to="/algorithms" replace />} />
           </Routes>
         </Suspense>
+        <ThemeToggle />
       </BrowserRouter>
     </QueryClientProvider>
   );
