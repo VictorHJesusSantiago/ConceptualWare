@@ -39,6 +39,14 @@ public class Treap<K extends Comparable<K>> {
         }
     }
 
+    // Node é uma inner class não-estática (carrega K implicitamente) — arrays de Node
+    // (`new Node[]{...}`) são "generic array creation", ilegal em Java. Usamos um par
+    // simples em vez de array para retornar dois nós de splitNode().
+    private class NodePair {
+        final Node first, second;
+        NodePair(Node first, Node second) { this.first = first; this.second = second; }
+    }
+
     // ── Rotations (same as BST rotations, restore heap property) ─────────────
 
     private Node rotateRight(Node y) {
@@ -121,24 +129,24 @@ public class Treap<K extends Comparable<K>> {
      * This O(log n) operation is the Treap's main advantage over Red-Black Trees.
      */
     public Treap<K>[] split(K splitKey) {
-        Node[] parts = splitNode(root, splitKey);
+        NodePair parts = splitNode(root, splitKey);
         @SuppressWarnings("unchecked")
         Treap<K>[] result = new Treap[2];
-        result[0] = new Treap<>(); result[0].root = parts[0];
-        result[1] = new Treap<>(); result[1].root = parts[1];
+        result[0] = new Treap<>(); result[0].root = parts.first;
+        result[1] = new Treap<>(); result[1].root = parts.second;
         return result;
     }
 
-    private Node[] splitNode(Node node, K key) {
-        if (node == null) return new Node[]{null, null};
+    private NodePair splitNode(Node node, K key) {
+        if (node == null) return new NodePair(null, null);
         if (key.compareTo(node.key) > 0) {
-            Node[] right = splitNode(node.right, key);
-            node.right = right[0];
-            return new Node[]{node, right[1]};
+            NodePair right = splitNode(node.right, key);
+            node.right = right.first;
+            return new NodePair(node, right.second);
         } else {
-            Node[] left = splitNode(node.left, key);
-            node.left = left[1];
-            return new Node[]{left[0], node};
+            NodePair left = splitNode(node.left, key);
+            node.left = left.second;
+            return new NodePair(left.first, node);
         }
     }
 
