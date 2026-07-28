@@ -76,20 +76,28 @@ public class ZeroTrustService {
     public static ServiceTokenClaims verifyServiceToken(String token, String expectedAudience,
                                                           Key verifyKey) {
         try {
-            Claims claims = Jwts.parserBuilder()
-                .setSigningKey(verifyKey)
-                .requireAudience(expectedAudience)
+            Claims claims = Jwts.parser()
+                .verifyWith((javax.crypto.SecretKey) verifyKey)
                 .build()
-                .parseClaimsJws(token)
-                .getBody();
+                .parseSignedClaims(token)
+                .getPayload();
 
-            if (!"service".equals(claims.get("type", String.class))) {
-                throw new SecurityException("Token type mismatch — expected service token");
+            // "Never trust, always verify": mismatch de audiência/tipo é rejeição
+            // esperada do protocolo, não uma condição excepcional — retorna claims
+            // inválidas (valid=false) em vez de propagar exceção não capturada.
+            if (!claims.getAudience().contains(expectedAudience)) {
+                return ServiceTokenClaims.failed("Audience mismatch — expected " + expectedAudience);
             }
+            if (!"service".equals(claims.get("type", String.class))) {
+                return ServiceTokenClaims.failed("Token type mismatch — expected service token");
+            }
+
+            // JJWT 0.12.x: getAudience() retorna Set<String> (multi-audiência) — pegamos o primeiro valor.
+            String audience = claims.getAudience().stream().findFirst().orElse(null);
 
             return new ServiceTokenClaims(
                 claims.getSubject(),
-                claims.getAudience(),
+                audience,
                 claims.getExpiration().toInstant(),
                 claims.getId(),
                 true,
@@ -130,10 +138,22 @@ public class ZeroTrustService {
 
         private final Deque<KeyVersion> keys = new ArrayDeque<>();
         private static final int MAX_KEY_AGE_DAYS = 90;
+        // Contador monotônico — Instant.now().toEpochMilli() sozinho colide quando
+        // duas chaves são geradas dentro do mesmo milissegundo (ex.: construtor
+        // seguido imediatamente de generateNewKey() no mesmo teste).
+        private final java.util.concurrent.atomic.AtomicLong keySeq = new java.util.concurrent.atomic.AtomicLong();
+
+        // O manager sempre começa com uma chave ativa (documentado na classe).
+        // activeKeyCount() lia keys.size() diretamente sem lazy-init — retornava 0
+        // antes de qualquer chamada a currentKey()/currentKeyId(), quebrando o
+        // invariante "starts with one active key".
+        public KeyRotationManager() {
+            generateNewKey();
+        }
 
         public synchronized void generateNewKey() {
             Key newKey = Keys.secretKeyFor(SignatureAlgorithm.HS256);
-            String keyId = "key-" + Instant.now().toEpochMilli();
+            String keyId = "key-" + Instant.now().toEpochMilli() + "-" + keySeq.incrementAndGet();
             Instant now  = Instant.now();
             keys.addFirst(new KeyVersion(keyId, newKey, now, now.plusSeconds(86400L * MAX_KEY_AGE_DAYS)));
             log.info("New signing key generated: {}", keyId);
