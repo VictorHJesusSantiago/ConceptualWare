@@ -38,6 +38,17 @@ public class Graph {
     public List<Edge> neighbors(int v) { return adjacencyList.get(v); }
     public int vertices() { return vertices; }
 
+    /** Grafo transposto (todas as arestas invertidas) — usado pelo algoritmo de Kosaraju (SCC). */
+    public Graph transpose() {
+        Graph result = new Graph(vertices, true);
+        for (int v = 0; v < vertices; v++) {
+            for (Edge e : adjacencyList.get(v)) {
+                result.addEdge(e.to(), v, e.weight());
+            }
+        }
+        return result;
+    }
+
     // ── BFS — Concept #5 ──────────────────────────────────────────────────────
 
     public List<Integer> bfs(int start) {
