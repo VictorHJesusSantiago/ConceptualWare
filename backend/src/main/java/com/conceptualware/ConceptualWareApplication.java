@@ -3,7 +3,6 @@ package com.conceptualware;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cache.annotation.EnableCaching;
-import org.springframework.data.mongodb.config.EnableMongoAuditing;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
@@ -18,7 +17,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  */
 @SpringBootApplication
 @EnableCaching          // Cache-Aside Pattern (Concept 26)
-@EnableMongoAuditing    // Auditing (Concept 11)
+// @EnableMongoAuditing vive em config/MongoConfig.java — declará-la aqui também
+// registrava o bean 'mongoAuditingHandler' duas vezes (BeanDefinitionOverrideException).
 @EnableAsync            // Async processing (Concept 18)
 @EnableScheduling       // Scheduled tasks (Concept 23 — DevOps automation)
 public class ConceptualWareApplication {
