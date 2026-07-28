@@ -299,7 +299,9 @@ public class LogicEngine {
     public String karnaughMinimize2Var(boolean[] minterms) {
         // minterms[0]=F(0,0), [1]=F(0,1), [2]=F(1,0), [3]=F(1,1)
         if (minterms.length != 4) throw new IllegalArgumentException("Need exactly 4 minterms for 2 variables");
-        long trueCount = Arrays.stream(minterms).filter(b -> b).count();
+        // Arrays.stream() não tem overload para boolean[] — contamos manualmente.
+        long trueCount = 0;
+        for (boolean b : minterms) if (b) trueCount++;
         if (trueCount == 4) return "1";          // tautology
         if (trueCount == 0) return "0";          // contradiction
         if (minterms[0] && minterms[1]) return "¬A";        // AB=00,01 → ¬A
