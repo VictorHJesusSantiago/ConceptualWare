@@ -20,7 +20,7 @@ class LanguagePrimitivesTest {
     @Test
     @DisplayName("DbC: valid withdrawal satisfies postcondition and invariant")
     void testDbcValidWithdrawal() {
-        var account = new LanguagePrimitives.DesignByContract.BankAccount(1000);
+        var account = new LanguagePrimitives.DesignByContract(1000);
         account.withdraw(300);
         assertEquals(700, account.getBalance());
     }
@@ -28,14 +28,14 @@ class LanguagePrimitivesTest {
     @Test
     @DisplayName("DbC: precondition rejects negative withdrawal amount")
     void testDbcPreconditionViolation() {
-        var account = new LanguagePrimitives.DesignByContract.BankAccount(500);
+        var account = new LanguagePrimitives.DesignByContract(500);
         assertThrows(AssertionError.class, () -> account.withdraw(-50));
     }
 
     @Test
     @DisplayName("DbC: precondition rejects overdraft (amount > balance)")
     void testDbcOverdraftRejected() {
-        var account = new LanguagePrimitives.DesignByContract.BankAccount(100);
+        var account = new LanguagePrimitives.DesignByContract(100);
         assertThrows(AssertionError.class, () -> account.withdraw(200));
     }
 
