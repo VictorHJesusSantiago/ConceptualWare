@@ -1,0 +1,84 @@
+{
+  "algorithms" : {
+    "Bubble" : {
+      "name" : "Bubble Sort",
+      "timeAvg" : "O(n²)",
+      "timeWorst" : "O(n²)",
+      "timeBest" : "O(n)",
+      "space" : "O(1)",
+      "stable" : true
+    },
+    "Counting" : {
+      "name" : "Counting Sort",
+      "timeAvg" : "O(n+k)",
+      "timeWorst" : "O(n+k)",
+      "timeBest" : "O(n+k)",
+      "space" : "O(k)",
+      "stable" : true
+    },
+    "Heap" : {
+      "name" : "Heap Sort",
+      "timeAvg" : "O(n log n)",
+      "timeWorst" : "O(n log n)",
+      "timeBest" : "O(n log n)",
+      "space" : "O(1)",
+      "stable" : false
+    },
+    "Insertion" : {
+      "name" : "Insertion Sort",
+      "timeAvg" : "O(n²)",
+      "timeWorst" : "O(n²)",
+      "timeBest" : "O(n)",
+      "space" : "O(1)",
+      "stable" : true
+    },
+    "Merge" : {
+      "name" : "Merge Sort",
+      "timeAvg" : "O(n log n)",
+      "timeWorst" : "O(n log n)",
+      "timeBest" : "O(n log n)",
+      "space" : "O(n)",
+      "stable" : true
+    },
+    "Quick" : {
+      "name" : "Quick Sort",
+      "timeAvg" : "O(n log n)",
+      "timeWorst" : "O(n²)",
+      "timeBest" : "O(n log n)",
+      "space" : "O(log n)",
+      "stable" : false
+    },
+    "Radix" : {
+      "name" : "Radix Sort",
+      "timeAvg" : "O(d*(n+k))",
+      "timeWorst" : "O(d*(n+k))",
+      "timeBest" : "O(d*(n+k))",
+      "space" : "O(n+k)",
+      "stable" : true
+    },
+    "Selection" : {
+      "name" : "Selection Sort",
+      "timeAvg" : "O(n²)",
+      "timeWorst" : "O(n²)",
+      "timeBest" : "O(n²)",
+      "space" : "O(1)",
+      "stable" : false
+    },
+    "Shell" : {
+      "name" : "Shell Sort",
+      "timeAvg" : "O(n log²n)",
+      "timeWorst" : "O(n²)",
+      "timeBest" : "O(n log n)",
+      "space" : "O(1)",
+      "stable" : false
+    },
+    "Tim" : {
+      "name" : "Tim Sort",
+      "timeAvg" : "O(n log n)",
+      "timeWorst" : "O(n log n)",
+      "timeBest" : "O(n)",
+      "space" : "O(n)",
+      "stable" : true
+    }
+  }
+}
