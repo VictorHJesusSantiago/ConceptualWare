@@ -144,8 +144,8 @@
         </dependency>
         <dependency>
             <groupId>de.flapdoodle.embed</groupId>
-            <artifactId>de.flapdoodle.embed.mongo.spring30x</artifactId>
-            <version>4.12.2</version>
+            <artifactId>de.flapdoodle.embed.mongo.spring31x</artifactId>
+            <version>4.11.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -179,10 +179,26 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- jqwik — Property-Based Testing (Concept 19): gera centenas de casos
+             aleatórios/edge-case a partir de propriedades declaradas (ex.: "para
+             qualquer array, FenwickTree.rangeSum == soma ingênua"), em vez de
+             exemplos fixos escritos à mão. -->
+        <dependency>
+            <groupId>net.jqwik</groupId>
+            <artifactId>jqwik</artifactId>
+            <version>1.8.4</version>
+            <scope>test</scope>
+        </dependency>
+
         <!-- OpenTelemetry — Distributed Tracing (Concept 27) -->
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-tracing-bridge-otel</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk-testing</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.opentelemetry</groupId>
@@ -226,6 +242,7 @@
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
                         </path>
                         <path>
                             <groupId>org.mapstruct</groupId>
@@ -276,6 +293,31 @@
                 <groupId>org.owasp</groupId>
                 <artifactId>dependency-check-maven</artifactId>
                 <version>9.0.9</version>
+            </plugin>
+
+            <!-- PIT Mutation Testing (Concept 19) — valida a QUALIDADE da suíte de testes,
+                 não só cobertura de linha: introduz mutações no bytecode (ex.: troca `<` por `<=`,
+                 remove chamadas void) e verifica se algum teste falha ("mata" a mutação).
+                 Rodar: mvn org.pitest:pitest-maven:mutationCoverage -->
+            <plugin>
+                <groupId>org.pitest</groupId>
+                <artifactId>pitest-maven</artifactId>
+                <version>1.15.8</version>
+                <configuration>
+                    <targetClasses>
+                        <param>com.conceptualware.core.datastructures.*</param>
+                        <param>com.conceptualware.core.algorithms.*</param>
+                        <param>com.conceptualware.domain.*</param>
+                    </targetClasses>
+                    <targetTests>
+                        <param>com.conceptualware.core.*</param>
+                        <param>com.conceptualware.domain.*</param>
+                    </targetTests>
+                    <mutationThreshold>60</mutationThreshold>
+                    <outputFormats>
+                        <outputFormat>HTML</outputFormat>
+                    </outputFormats>
+                </configuration>
             </plugin>
 
             <!-- Checkstyle (Concept 29) -->
