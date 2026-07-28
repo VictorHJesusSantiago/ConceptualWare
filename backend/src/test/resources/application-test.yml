@@ -1,4 +1,14 @@
-# Test profile: H2 in-memory, no Redis, no MongoDB external connections
+# Test profile: H2 in-memory, no Redis, MongoDB embutido (Flapdoodle — ver pom.xml
+# de.flapdoodle.embed.mongo.spring31x). O 'uri' abaixo é ignorado quando o
+# EmbeddedMongoAutoConfiguration está ativo — ele substitui o MongoClient por um
+# apontando para uma instância mongod real baixada e iniciada localmente numa
+# porta aleatória. Precisa da versão explícita (senão falha ao subir o contexto).
+de:
+  flapdoodle:
+    mongodb:
+      embedded:
+        version: 6.0.5
+
 spring:
   data:
     mongodb:
