@@ -252,6 +252,100 @@ public class GraphAlgorithms {
         return totalFlow;
     }
 
+    // ── Tarjan's SCC — O(V+E), single-pass DFS with low-link values ──────────
+
+    private int tarjanTimer;
+    private int[] tarjanIndex, tarjanLow;
+    private boolean[] tarjanOnStack;
+    private Deque<Integer> tarjanStack;
+    private List<List<Integer>> tarjanResult;
+
+    /** Componentes fortemente conexos via Tarjan (single DFS, low-link). */
+    public List<List<Integer>> tarjanSCC(Graph graph) {
+        int n = graph.vertices();
+        tarjanTimer = 0;
+        tarjanIndex = new int[n];
+        tarjanLow = new int[n];
+        tarjanOnStack = new boolean[n];
+        tarjanStack = new ArrayDeque<>();
+        tarjanResult = new ArrayList<>();
+        Arrays.fill(tarjanIndex, -1);
+
+        for (int v = 0; v < n; v++) {
+            if (tarjanIndex[v] == -1) tarjanDfs(graph, v);
+        }
+        return tarjanResult;
+    }
+
+    private void tarjanDfs(Graph graph, int v) {
+        tarjanIndex[v] = tarjanLow[v] = tarjanTimer++;
+        tarjanStack.push(v);
+        tarjanOnStack[v] = true;
+
+        for (Graph.Edge e : graph.neighbors(v)) {
+            int w = e.to();
+            if (tarjanIndex[w] == -1) {
+                tarjanDfs(graph, w);
+                tarjanLow[v] = Math.min(tarjanLow[v], tarjanLow[w]);
+            } else if (tarjanOnStack[w]) {
+                tarjanLow[v] = Math.min(tarjanLow[v], tarjanIndex[w]);
+            }
+        }
+
+        if (tarjanLow[v] == tarjanIndex[v]) {
+            List<Integer> component = new ArrayList<>();
+            int w;
+            do {
+                w = tarjanStack.pop();
+                tarjanOnStack[w] = false;
+                component.add(w);
+            } while (w != v);
+            tarjanResult.add(component);
+        }
+    }
+
+    // ── Kosaraju's SCC — O(V+E), two DFS passes + transpose graph ────────────
+
+    public static List<List<Integer>> kosarajuSCC(Graph graph) {
+        int n = graph.vertices();
+        boolean[] visited = new boolean[n];
+        Deque<Integer> finishOrder = new ArrayDeque<>();
+
+        for (int v = 0; v < n; v++) {
+            if (!visited[v]) kosarajuFillOrder(graph, v, visited, finishOrder);
+        }
+
+        Graph transposed = graph.transpose();
+
+        Arrays.fill(visited, false);
+        List<List<Integer>> components = new ArrayList<>();
+        while (!finishOrder.isEmpty()) {
+            int v = finishOrder.pop();
+            if (!visited[v]) {
+                List<Integer> component = new ArrayList<>();
+                kosarajuCollect(transposed, v, visited, component);
+                components.add(component);
+            }
+        }
+        return components;
+    }
+
+    private static void kosarajuFillOrder(Graph graph, int v, boolean[] visited, Deque<Integer> order) {
+        visited[v] = true;
+        for (Graph.Edge e : graph.neighbors(v)) {
+            if (!visited[e.to()]) kosarajuFillOrder(graph, e.to(), visited, order);
+        }
+        order.push(v);
+    }
+
+    private static void kosarajuCollect(Graph graph, int v, boolean[] visited, List<Integer> component) {
+        visited[v] = true;
+        component.add(v);
+        for (Graph.Edge e : graph.neighbors(v)) {
+            if (!visited[e.to()]) kosarajuCollect(graph, e.to(), visited, component);
+        }
+    }
+
     // ── TSP — Held-Karp DP — O(n² 2ⁿ) ──────────────────────────────────────
 
     public static double tspHeldKarp(double[][] dist) {
