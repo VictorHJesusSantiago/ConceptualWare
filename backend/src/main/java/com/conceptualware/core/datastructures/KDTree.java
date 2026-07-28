@@ -114,7 +114,12 @@ public class KDTree {
     public Optional<Point> nearestNeighbor(Point query) {
         if (root == null) return Optional.empty();
         NearestResult result = new NearestResult(null, Double.MAX_VALUE);
-        nearestNeighbor(root, query, result);
+        // NearestResult é um record imutável — withCandidate() retorna uma NOVA
+        // instância. O valor de retorno da chamada recursiva estava sendo
+        // descartado aqui, então 'result' nunca era atualizado e ficava sempre
+        // (null, MAX_VALUE), fazendo nearestNeighbor() retornar Optional.empty()
+        // mesmo com a árvore populada.
+        result = nearestNeighbor(root, query, result);
         return Optional.ofNullable(result.best);
     }
 
