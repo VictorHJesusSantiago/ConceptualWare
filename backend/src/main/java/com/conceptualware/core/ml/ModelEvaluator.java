@@ -131,17 +131,28 @@ public class ModelEvaluator {
         int neg = actual.length - pos;
         if (pos == 0 || neg == 0) return Double.NaN;
 
+        // Amostras com a MESMA probabilidade precisam ser processadas como um único
+        // "batch": atualizar tp/fp uma de cada vez (ordem arbitrária dentro do
+        // empate) e desenhar um degrau por amostra distorce a curva — o resultado
+        // passa a depender da ordem de desempate em vez de refletir a indiferença
+        // real do modelo entre essas amostras. O algoritmo correto agrega todo o
+        // grupo empatado e desenha um único segmento de reta.
         double auc = 0, tpPrev = 0, fpPrev = 0, tp = 0, fp = 0;
-        for (int idx : indices) {
-            if (actual[idx] == 1) tp++;
-            else                  fp++;
+        int i = 0;
+        while (i < indices.length) {
+            int j = i;
+            double currentProba = proba[indices[i]];
+            while (j < indices.length && proba[indices[j]] == currentProba) {
+                if (actual[indices[j]] == 1) tp++;
+                else                         fp++;
+                j++;
+            }
             double tpr = tp / pos;
             double fpr = fp / neg;
             auc += (fpr - fpPrev/neg) * (tpr + tpPrev/pos) / 2; // trapezoidal
             tpPrev = tp; fpPrev = fp;
+            i = j;
         }
-        // Final point
-        auc += (1 - fpPrev/neg) * (1 + tpPrev/pos) / 2;
         return auc;
     }
 
