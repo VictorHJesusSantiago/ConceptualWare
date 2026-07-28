@@ -95,7 +95,11 @@ public class HashTable<K, V> {
             Entry<K, V> curr = head;
             while (curr != null) {
                 Entry<K, V> next = curr.next;
-                int idx = Math.abs(curr.key.hashCode() % capacity);
+                // BUG CORRIGIDO: recalculava o índice com curr.key.hashCode() % capacity
+                // direto, sem o mesmo XOR-fold (h ^= h >>> 16) que hash() aplica — o
+                // bucket do resize divergia do bucket usado por get()/findEntry(),
+                // fazendo get() retornar null para chaves recém-realocadas.
+                int idx = hash(curr.key);
                 curr.next = newBuckets[idx];
                 newBuckets[idx] = curr;
                 curr = next;

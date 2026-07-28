@@ -15,12 +15,12 @@ public class Heap<T> {
 
     /** Min-heap with natural ordering. */
     public static <T extends Comparable<T>> Heap<T> minHeap() {
-        return new Heap<>(Comparator.naturalOrder(), true);
+        return new Heap<T>(Comparator.<T>naturalOrder(), true);
     }
 
     /** Max-heap with natural ordering. */
     public static <T extends Comparable<T>> Heap<T> maxHeap() {
-        return new Heap<>(Comparator.reverseOrder(), false);
+        return new Heap<T>(Comparator.<T>reverseOrder(), false);
     }
 
     public Heap(Comparator<T> comparator, boolean isMinHeap) {
