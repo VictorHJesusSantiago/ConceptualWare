@@ -3,6 +3,7 @@ package com.conceptualware.api.rest;
 import com.conceptualware.domain.user.User;
 import com.conceptualware.infrastructure.persistence.UserRepository;
 import com.conceptualware.infrastructure.security.JwtService;
+import com.conceptualware.security.SecurityAuditService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ public class AuthController {
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
+    private final SecurityAuditService securityAuditService;
 
     // ── POST /api/v1/auth/register ────────────────────────────────────────────
 
@@ -65,6 +67,8 @@ public class AuthController {
         // Lockout check — Concept #21 (brute force protection)
         if (user.isLockedOut()) {
             long secondsRemaining = user.lockoutRemaining().getSeconds();
+            securityAuditService.record(SecurityAuditService.EventType.ACCOUNT_LOCKOUT,
+                user.getId(), "Login attempt while locked out, " + secondsRemaining + "s remaining");
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
                 "Account temporarily locked. Try again in " + secondsRemaining + " seconds.");
         }
@@ -77,6 +81,8 @@ public class AuthController {
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             user.recordFailedLogin();
             userRepository.save(user);
+            securityAuditService.record(SecurityAuditService.EventType.LOGIN_FAILURE,
+                user.getId(), "Invalid password");
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
         }
 
