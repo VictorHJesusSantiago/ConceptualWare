@@ -1,5 +1,7 @@
 package com.conceptualware.core.compiler;
 
+import com.conceptualware.core.compiler.IRGenerator.IR;
+
 import java.util.*;
 
 /**
