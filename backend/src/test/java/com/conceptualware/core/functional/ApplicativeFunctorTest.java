@@ -51,7 +51,8 @@ class ApplicativeFunctorTest {
     @Test
     @DisplayName("Maybe.ap: Just(f) applied to Nothing = Nothing")
     void testMaybeApNothingVal() {
-        var mf = ApplicativeFunctor.Maybe.just((Integer x) -> x + 1);
+        ApplicativeFunctor.Maybe<Function<Integer, Integer>> mf =
+            ApplicativeFunctor.Maybe.just((Function<Integer, Integer>) (x -> x + 1));
         ApplicativeFunctor.Maybe<Integer> mv = ApplicativeFunctor.Maybe.nothing();
         assertFalse(ApplicativeFunctor.Maybe.ap(mf, mv).isPresent());
     }
