@@ -8,7 +8,13 @@ import { apiLimiter, authLimiter } from './middleware/rateLimiter.js';
 import algorithmRoutes from './routes/algorithms.js';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
+import coreConceptsRoutes from './routes/coreConcepts.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { correlationId } from './middleware/correlationId.js';
+import { allCircuitBreakersStatus, getCircuitBreaker } from './middleware/circuitBreaker.js';
+import { cacheStats } from './middleware/responseCache.js';
+import { listFeatureFlags } from './middleware/featureFlags.js';
+import axios from 'axios';
 
 /**
  * Concept #16 — HTTP/1.1, HTTP/2, Proxy Reverso, CORS, Headers
@@ -65,6 +71,10 @@ app.use(cors({
 
 app.use(compression({ threshold: 2048 }));
 
+// ── Correlation ID — Concept #27 (propagado ponta a ponta) ───────────────────
+
+app.use(correlationId);
+
 // ── Request parsing ────────────────────────────────────────────────────────────
 
 app.use(express.json({ limit: '1mb' }));
@@ -93,16 +103,44 @@ app.get('/health', (_req, res) => {
   });
 });
 
-app.get('/health/ready', (_req, res) => {
-  // Readiness probe — check downstream dependencies
-  res.json({ status: 'ready', backend: 'ok', mongodb: 'ok' });
+app.get('/health/ready', async (_req, res) => {
+  // Readiness probe — checagem real do backend (não mais hardcoded)
+  const backendUrl = process.env['BACKEND_URL'] ?? 'http://localhost:8080';
+  let backendStatus: 'ok' | 'down' = 'down';
+  try {
+    await axios.get(`${backendUrl}/actuator/health`, { timeout: 2000 });
+    backendStatus = 'ok';
+  } catch {
+    backendStatus = 'down';
+  }
+
+  const overallStatus = backendStatus === 'ok' ? 'ready' : 'not-ready';
+  res.status(overallStatus === 'ready' ? 200 : 503).json({
+    status: overallStatus,
+    backend: backendStatus,
+    circuitBreakers: allCircuitBreakersStatus(),
+  });
 });
+
+// ── Diagnostics — cache stats, feature flags, circuit breakers ───────────────
+
+app.get('/diagnostics', (_req, res) => {
+  res.json({
+    cache: cacheStats(),
+    featureFlags: listFeatureFlags(),
+    circuitBreakers: allCircuitBreakersStatus(),
+  });
+});
+
+// Pré-registra o circuit breaker do backend para aparecer em /diagnostics desde o boot.
+getCircuitBreaker('backend');
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
 app.use('/api/v1/auth',       authLimiter, authRoutes);
 app.use('/api/v1/algorithms', apiLimiter,  algorithmRoutes);
 app.use('/api/v1/users',      apiLimiter,  userRoutes);
+app.use('/api/v1/core-concepts', apiLimiter, coreConceptsRoutes);
 
 // ── Error handling ────────────────────────────────────────────────────────────
 

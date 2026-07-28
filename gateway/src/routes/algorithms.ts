@@ -5,6 +5,9 @@ import { authenticate, optionalAuth } from '../middleware/auth.js';
 import { algorithmExecutionLimiter } from '../middleware/rateLimiter.js';
 import { memoize, pipe } from '../utils/functional.js';
 import { Category, Difficulty, AlgoSlug, ok, err } from '../types/index.js';
+import { cacheResponse } from '../middleware/responseCache.js';
+import { getCircuitBreaker, CircuitOpenError } from '../middleware/circuitBreaker.js';
+import { forwardedHeaders } from '../middleware/correlationId.js';
 
 /**
  * Concept #25 — REST API: Endpoints, Paginação cursor/offset, Filtros
@@ -16,6 +19,7 @@ import { Category, Difficulty, AlgoSlug, ok, err } from '../types/index.js';
 
 const router = Router();
 const BACKEND = process.env['BACKEND_URL'] ?? 'http://localhost:8080';
+const backendCircuit = getCircuitBreaker('backend');
 
 // ── Input validation schemas (Concept #3 & #21) ───────────────────────────────
 
@@ -49,15 +53,22 @@ const fetchAlgorithm = memoize(async (slug: string) => {
 
 // ── GET /api/v1/algorithms ────────────────────────────────────────────────────
 
-router.get('/', optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', optionalAuth, cacheResponse(60_000), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const params = ListSchema.parse(req.query);
-    const response = await axios.get(`${BACKEND}/api/v1/algorithms`, {
-      params,
-      timeout: 5000,
-    });
+    const response = await backendCircuit.execute(() =>
+      axios.get(`${BACKEND}/api/v1/algorithms`, {
+        params,
+        timeout: 5000,
+        headers: forwardedHeaders(req),
+      })
+    );
     res.json(response.data);
   } catch (error) {
+    if (error instanceof CircuitOpenError) {
+      res.status(503).json({ error: 'Service temporarily unavailable', reason: error.message });
+      return;
+    }
     next(error);
   }
 });
