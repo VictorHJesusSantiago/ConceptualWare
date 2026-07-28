@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
+import org.springframework.data.geo.Distance;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -157,6 +158,36 @@ public class RedisConfig {
             redis.opsForSet().add("online-users", "alice", "bob", "carol");
             Boolean isOnline = redis.opsForSet().isMember("online-users", "alice"); // SISMEMBER
             redis.opsForSet().remove("online-users", "alice");
+        }
+
+        // HyperLogLog — cardinality estimation (PFADD/PFCOUNT/PFMERGE), ±0.81% erro, ~12KB fixos
+        public long uniqueVisitorsDemo(String day, String... visitorIds) {
+            String key = "visitors:hll:" + day;
+            redis.opsForHyperLogLog().add(key, (Object[]) visitorIds); // PFADD
+            return redis.opsForHyperLogLog().size(key);                // PFCOUNT (aproximado)
+        }
+
+        public long mergeUniqueVisitors(String destKey, String... sourceKeys) {
+            redis.opsForHyperLogLog().union(destKey, sourceKeys); // PFMERGE
+            return redis.opsForHyperLogLog().size(destKey);
+        }
+
+        // GEO — indexação geoespacial (GEOADD/GEODIST/GEOSEARCH), sorted set por trás
+        public void geoDemo() {
+            var geo = redis.opsForGeo();
+            geo.add("locations:offices", new org.springframework.data.geo.Point(-46.6333, -23.5505), "sao-paulo");
+            geo.add("locations:offices", new org.springframework.data.geo.Point(-43.1729, -22.9068), "rio-de-janeiro");
+
+            Distance dist = geo.distance("locations:offices", "sao-paulo", "rio-de-janeiro",
+                org.springframework.data.geo.Metrics.KILOMETERS); // GEODIST
+
+            var nearby = geo.radius("locations:offices", "sao-paulo",
+                new Distance(500, org.springframework.data.geo.Metrics.KILOMETERS)); // GEOSEARCH raio
+        }
+
+        // PUB/SUB — publica em um canal (assinantes reais requerem um MessageListener registrado)
+        public void publishDemo(String channel, Object message) {
+            redis.convertAndSend(channel, message); // PUBLISH
         }
 
         // Sliding window rate limiter using ZSET
