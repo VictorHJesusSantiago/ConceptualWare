@@ -1,5 +1,6 @@
 package com.conceptualware.core.compiler;
 
+import com.conceptualware.core.compiler.IRGenerator.IR;
 import org.junit.jupiter.api.*;
 
 import java.util.List;
@@ -266,31 +267,39 @@ class CompilerTest {
 
         @Test @DisplayName("constant folding: 3 + 4 → 7")
         void constantFolding() {
-            var ir = List.of(new IR.BinOp("t0", "3", "+", "4"));
+            // t0 precisa ser "usado" (aqui, por Print) — senão o DCE, corretamente,
+            // elimina o resultado dobrado por ninguém referenciar t0 depois.
+            List<IR> ir = List.of(
+                new IR.BinOp("t0", "3", "+", "4"),
+                new IR.Print("t0")
+            );
             var stats = new Optimizer().optimize(ir);
             assertThat(stats.constantsFolded()).isGreaterThan(0);
+            // Após fold + propagação + DCE (que roda na mesma iteração), o valor "7"
+            // acaba propagado diretamente para o Print — o Copy intermediário t0=7
+            // é corretamente eliminado por ser código morto (t0 não é mais lido).
             assertThat(stats.optimizedIR().stream()
-                .anyMatch(i -> i instanceof IR.Copy c && c.source().equals("7")))
+                .anyMatch(i -> i instanceof IR.Print p && p.value().equals("7")))
                 .isTrue();
         }
 
         @Test @DisplayName("algebraic simplification: x + 0 → x")
         void algebraicSimplification() {
-            var ir = List.of(new IR.BinOp("t0", "x", "+", "0"));
+            List<IR> ir = List.of(new IR.BinOp("t0", "x", "+", "0"));
             var stats = new Optimizer().optimize(ir);
             assertThat(stats.algebraicSimplifications()).isGreaterThan(0);
         }
 
         @Test @DisplayName("algebraic simplification: x * 0 → 0")
         void multiplyByZero() {
-            var ir = List.of(new IR.BinOp("t0", "x", "*", "0"));
+            List<IR> ir = List.of(new IR.BinOp("t0", "x", "*", "0"));
             var stats = new Optimizer().optimize(ir);
             assertThat(stats.algebraicSimplifications()).isGreaterThan(0);
         }
 
         @Test @DisplayName("CSE eliminates duplicate computation")
         void commonSubexpressionElimination() {
-            var ir = List.of(
+            List<IR> ir = List.of(
                 new IR.BinOp("t0", "a", "+", "b"),
                 new IR.BinOp("t1", "a", "+", "b")  // same expression
             );
@@ -300,7 +309,7 @@ class CompilerTest {
 
         @Test @DisplayName("optimization stats report")
         void statsReport() {
-            var ir = List.of(
+            List<IR> ir = List.of(
                 new IR.BinOp("t0", "2", "*", "3"),  // constant fold
                 new IR.BinOp("t1", "t0", "+", "0")  // algebraic simplify
             );
