@@ -127,11 +127,11 @@ public class KeyRotationService {
         KeyEntry entry = kid != null ? keyRing.get(kid) : null;
         Key verifyKey  = entry != null ? entry.key() : currentKey;
 
-        return Jwts.parserBuilder()
-            .setSigningKey(verifyKey)
+        return Jwts.parser()
+            .verifyWith((javax.crypto.SecretKey) verifyKey)
             .build()
-            .parseClaimsJws(token)
-            .getBody();
+            .parseSignedClaims(token)
+            .getPayload();
     }
 
     private String extractKid(String token) {
