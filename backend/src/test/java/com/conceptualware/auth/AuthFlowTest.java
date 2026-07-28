@@ -159,7 +159,9 @@ class AuthFlowTest {
         }
 
         @ParameterizedTest
-        @ValueSource(strings = { "ab", "a b", "user@name", "u".repeat(51) })
+        // "uuuuu...u" (51 chars) — anotações exigem expressões constantes em tempo de
+        // compilação; "u".repeat(51) não é constante, por isso o literal explícito.
+        @ValueSource(strings = { "ab", "a b", "user@name", "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu" })
         @DisplayName("Username inválido lança IllegalArgumentException")
         void invalidUsernameRejected(String username) {
             assertThatThrownBy(() -> new User.Username(username))
