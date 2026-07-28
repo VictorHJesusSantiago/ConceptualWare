@@ -1,0 +1,12 @@
+Algorithm            Best            Average         Worst           Space      Stable  
+-------------------------------------------------------------------------------------
+Bubble Sort          O(n)            O(n²)           O(n²)           O(1)       true    
+Counting Sort        O(n+k)          O(n+k)          O(n+k)          O(k)       true    
+Heap Sort            O(n log n)      O(n log n)      O(n log n)      O(1)       false   
+Insertion Sort       O(n)            O(n²)           O(n²)           O(1)       true    
+Merge Sort           O(n log n)      O(n log n)      O(n log n)      O(n)       true    
+Quick Sort           O(n log n)      O(n log n)      O(n²)           O(log n)   false   
+Radix Sort           O(d*(n+k))      O(d*(n+k))      O(d*(n+k))      O(n+k)     true    
+Selection Sort       O(n²)           O(n²)           O(n²)           O(1)       false   
+Shell Sort           O(n log n)      O(n log²n)      O(n²)           O(1)       false   
+Tim Sort             O(n)            O(n log n)      O(n log n)      O(n)       true    
