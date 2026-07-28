@@ -184,6 +184,95 @@ public class StringAlgorithms {
         return s.substring(start, start + maxLen);
     }
 
+    // ── Z-Algorithm — O(n), pattern matching via Z-array ──────────────────────
+
+    /** Z[i] = tamanho do maior prefixo comum entre s e o sufixo de s começando em i. */
+    public static int[] zArray(String s) {
+        int n = s.length();
+        int[] z = new int[n];
+        int l = 0, r = 0;
+        for (int i = 1; i < n; i++) {
+            if (i < r) z[i] = Math.min(r - i, z[i - l]);
+            while (i + z[i] < n && s.charAt(z[i]) == s.charAt(i + z[i])) z[i]++;
+            if (i + z[i] > r) { l = i; r = i + z[i]; }
+        }
+        return z;
+    }
+
+    /** Busca de padrão via Z-algorithm: concatena pattern + separador + text. */
+    public static List<Integer> zSearch(String text, String pattern) {
+        List<Integer> matches = new ArrayList<>();
+        String combined = pattern + "" + text;
+        int[] z = zArray(combined);
+        int patternLen = pattern.length();
+        for (int i = patternLen + 1; i < combined.length(); i++) {
+            if (z[i] == patternLen) matches.add(i - patternLen - 1);
+        }
+        return matches;
+    }
+
+    // ── Aho-Corasick — O(n + m + z), multi-pattern matching via autômato ──────
+
+    public static class AhoCorasick {
+        private static class Node {
+            Map<Character, Node> children = new HashMap<>();
+            Node fail;
+            List<String> output = new ArrayList<>();
+        }
+
+        private final Node root = new Node();
+
+        public AhoCorasick(Collection<String> patterns) {
+            for (String pattern : patterns) addPattern(pattern);
+            buildFailureLinks();
+        }
+
+        private void addPattern(String pattern) {
+            Node curr = root;
+            for (char c : pattern.toCharArray()) {
+                curr = curr.children.computeIfAbsent(c, k -> new Node());
+            }
+            curr.output.add(pattern);
+        }
+
+        private void buildFailureLinks() {
+            Queue<Node> queue = new LinkedList<>();
+            for (Node child : root.children.values()) {
+                child.fail = root;
+                queue.offer(child);
+            }
+            while (!queue.isEmpty()) {
+                Node curr = queue.poll();
+                for (Map.Entry<Character, Node> entry : curr.children.entrySet()) {
+                    char c = entry.getKey();
+                    Node child = entry.getValue();
+                    Node failCandidate = curr.fail;
+                    while (failCandidate != null && !failCandidate.children.containsKey(c)) {
+                        failCandidate = failCandidate.fail;
+                    }
+                    child.fail = (failCandidate == null) ? root : failCandidate.children.get(c);
+                    child.output.addAll(child.fail.output);
+                    queue.offer(child);
+                }
+            }
+        }
+
+        /** Retorna, para cada padrão encontrado, a lista de índices finais (0-indexed) na string. */
+        public Map<String, List<Integer>> search(String text) {
+            Map<String, List<Integer>> results = new HashMap<>();
+            Node curr = root;
+            for (int i = 0; i < text.length(); i++) {
+                char c = text.charAt(i);
+                while (curr != root && !curr.children.containsKey(c)) curr = curr.fail;
+                curr = curr.children.getOrDefault(c, root);
+                for (String matched : curr.output) {
+                    results.computeIfAbsent(matched, k -> new ArrayList<>()).add(i);
+                }
+            }
+            return results;
+        }
+    }
+
     // ── String Hashing ─────────────────────────────────────────────────────────
 
     public static long polynomialHash(String s, long base, long mod) {
