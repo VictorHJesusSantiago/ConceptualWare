@@ -112,7 +112,18 @@ public class SVM {
         int passes = 0;
         int maxPasses = Math.min(maxIter, n * 10);
 
-        while (passes < maxPasses) {
+        // BUG CORRIGIDO: 'passes' conta sweeps CONSECUTIVOS sem nenhuma mudança de
+        // alpha — é resetado a 0 sempre que QUALQUER par (i,j) muda, mesmo que por
+        // uma fração mínima. Para kernels mal-condicionados (ex.: polinomial com
+        // coef0/gamma que produzem 'eta' pequeno), os alphas podem oscilar
+        // indefinidamente sem nunca atingir 'numChanged == 0' — isso fazia o loop
+        // rodar para sempre, pois 'passes' nunca alcançava maxPasses. Um contador de
+        // sweeps TOTAIS garante terminação mesmo sem convergência.
+        int totalSweeps = 0;
+        int maxTotalSweeps = Math.max(maxPasses, n) * 20;
+
+        while (passes < maxPasses && totalSweeps < maxTotalSweeps) {
+            totalSweeps++;
             int numChanged = 0;
 
             for (int i = 0; i < n; i++) {

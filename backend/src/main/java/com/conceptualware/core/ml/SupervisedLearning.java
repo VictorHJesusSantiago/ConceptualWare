@@ -297,7 +297,8 @@ public class SupervisedLearning {
             }
             double bestGain = -1; int bestFeat = -1; double bestThresh = 0;
             for (int j = 0; j < X[0].length; j++) {
-                double[] vals = Arrays.stream(X).mapToDouble(row -> row[j]).toArray();
+                final int feature = j; // captura effectively-final para o lambda abaixo
+                double[] vals = Arrays.stream(X).mapToDouble(row -> row[feature]).toArray();
                 Arrays.sort(vals);
                 for (int t = 0; t < vals.length - 1; t++) {
                     double thresh = (vals[t] + vals[t+1]) / 2;
