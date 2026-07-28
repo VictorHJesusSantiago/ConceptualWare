@@ -74,8 +74,8 @@ public class Parser {
             case WHILE      -> whileStmt();
             case FOR        -> forStmt();
             case RETURN     -> returnStmt();
-            case BREAK      -> { advance(); yield new AST.Stmt.Break(previous().line()); consume(Token.TokenType.SEMICOLON, "Expected ';'"); }
-            case CONTINUE   -> { advance(); yield new AST.Stmt.Continue(previous().line()); consume(Token.TokenType.SEMICOLON, "Expected ';'"); }
+            case BREAK      -> { advance(); int line = previous().line(); consume(Token.TokenType.SEMICOLON, "Expected ';'"); yield new AST.Stmt.Break(line); }
+            case CONTINUE   -> { advance(); int line = previous().line(); consume(Token.TokenType.SEMICOLON, "Expected ';'"); yield new AST.Stmt.Continue(line); }
             case PRINT      -> printStmt();
             case LEFT_BRACE -> block();
             default         -> exprStmt();
