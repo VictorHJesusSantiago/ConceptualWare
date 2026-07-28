@@ -62,6 +62,11 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/algorithms/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/challenges/**").permitAll()
+                // Demos stateless de conceitos (grafos, DS avançadas, strings, concorrência,
+                // padrões arquiteturais) — sem side-effects em dados de usuário, sandbox público.
+                .requestMatchers("/api/v1/core-concepts/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/security/csrf-token").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/security/csp-report").permitAll()
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/actuator/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
