@@ -60,11 +60,6 @@ public class AlgorithmApplicationService {
             long durationNs = System.nanoTime() - startNs;
             metricsService.recordAlgorithmExecutionTime(algorithmName, durationNs);
 
-            Map<String, Object> complexity = new HashMap<>();
-            SortingAlgorithms.complexityTable().get(toPascalCase(algorithmName)).ifPresent_or_else(
-                c -> {}, // handled below
-                () -> {}
-            );
             var info = SortingAlgorithms.complexityTable().get(toPascalCase(algorithmName));
 
             return CompletableFuture.completedFuture(new ExecutionResult(
