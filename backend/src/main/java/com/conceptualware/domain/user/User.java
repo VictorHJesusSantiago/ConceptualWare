@@ -80,7 +80,12 @@ public class User extends AggregateRoot {
     private Instant emailVerifiedAt;
 
     // Refresh tokens (Concept #21 — Token management)
-    private final Map<String, Instant> refreshTokens = new HashMap<>();
+    // LinkedHashMap preserva ordem de INSERÇÃO — necessário para evict corretamente
+    // a sessão mais antiga (ver storeRefreshToken). Um HashMap comum não garante
+    // nenhuma ordem, e usar o valor (expiração = now+7dias) como proxy de "mais
+    // antigo" não funciona: todas as expirações são calculadas a poucos
+    // microssegundos de distância dentro de um mesmo loop de inserção.
+    private final Map<String, Instant> refreshTokens = new LinkedHashMap<>();
 
     // ── Lockout por força bruta (Concept #21 — Brute Force Protection) ──────────
     // Bloqueia a conta por LOCKOUT_DURATION após MAX_FAILED_ATTEMPTS consecutivos.
@@ -141,11 +146,13 @@ public class User extends AggregateRoot {
     public void removeFromFavorites(String algorithmId) { this.favorites.remove(algorithmId); }
 
     public void storeRefreshToken(String token) {
-        // Limit to 5 concurrent sessions — Concept #21 (session management)
+        // Limit to 5 concurrent sessions — Concept #21 (session management).
+        // Evict pela ORDEM DE INSERÇÃO (LinkedHashMap), não pelo valor de
+        // expiração — todas as expirações são "now + 7 dias" calculadas quase
+        // simultaneamente, então comparar por valor não identifica de forma
+        // confiável qual token foi inserido primeiro.
         if (refreshTokens.size() >= 5) {
-            String oldest = refreshTokens.entrySet().stream()
-                .min(Map.Entry.comparingByValue())
-                .map(Map.Entry::getKey).orElse(null);
+            String oldest = refreshTokens.keySet().stream().findFirst().orElse(null);
             if (oldest != null) refreshTokens.remove(oldest);
         }
         refreshTokens.put(token, Instant.now().plusSeconds(604800)); // 7 days
