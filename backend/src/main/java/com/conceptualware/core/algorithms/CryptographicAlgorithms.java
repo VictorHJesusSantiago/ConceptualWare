@@ -209,7 +209,12 @@ public class CryptographicAlgorithms {
 
         int bitsChanged = 0;
         for (int i = 0; i < original.length; i++) {
-            bitsChanged += Integer.bitCount(original[i] ^ flipped[i]);
+            // byte ^ byte promove ambos os operandos a int via SIGN-EXTENSION antes
+            // do XOR — se um byte for negativo (bit 7 setado), os bits 8-31 do
+            // resultado ficam poluídos com 1s "fantasma", inflando bitCount muito
+            // além do máximo possível de 8 bits por byte. Mascarar com & 0xFF trata
+            // o byte como valor sem sinal (0-255) antes do XOR.
+            bitsChanged += Integer.bitCount((original[i] & 0xFF) ^ (flipped[i] & 0xFF));
         }
 
         return new AvalancheResult(bytesToHex(original), bytesToHex(flipped),
