@@ -19,6 +19,79 @@ import java.util.function.*;
  */
 public class ConcurrencyUtils {
 
+    // ── Structured Concurrency — StructuredTaskScope (JEP 453, preview) ───────
+
+    /**
+     * Fan-out/fan-in: dispara N tarefas em Virtual Threads e falha rápido se
+     * qualquer uma lançar exceção (ShutdownOnFailure) — todas as tarefas irmãs
+     * são canceladas automaticamente ("structured": nenhuma thread escapa do escopo).
+     */
+    public static <T> List<T> structuredFanOut(List<Callable<T>> tasks) throws InterruptedException, ExecutionException {
+        try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
+            List<StructuredTaskScope.Subtask<T>> subtasks = new ArrayList<>();
+            for (Callable<T> task : tasks) {
+                subtasks.add(scope.fork(task::call));
+            }
+            scope.join();
+            scope.throwIfFailed();
+            List<T> results = new ArrayList<>();
+            for (var subtask : subtasks) results.add(subtask.get());
+            return results;
+        }
+    }
+
+    /**
+     * Corrida entre tarefas: retorna o primeiro resultado bem-sucedido e cancela
+     * as demais (ShutdownOnSuccess) — útil para chamadas redundantes a réplicas.
+     */
+    public static <T> T structuredRace(List<Callable<T>> tasks) throws InterruptedException, ExecutionException {
+        try (var scope = new StructuredTaskScope.ShutdownOnSuccess<T>()) {
+            for (Callable<T> task : tasks) scope.fork(task::call);
+            scope.join();
+            return scope.result();
+        }
+    }
+
+    // ── Virtual Threads vs Platform Threads — benchmark comparativo ──────────
+
+    public record ThreadBenchmarkResult(String mode, int taskCount, long elapsedMillis, long peakThreadsEstimate) {}
+
+    /**
+     * Compara throughput de N tarefas I/O-bound (simuladas com sleep) executando
+     * em Virtual Threads vs. um pool fixo de Platform Threads. Virtual Threads
+     * escalam para dezenas de milhares de tarefas sem exaurir memória do SO;
+     * Platform Threads são limitados pelo tamanho do pool.
+     */
+    public static ThreadBenchmarkResult benchmarkVirtualThreads(int taskCount, int simulatedIoMillis) throws InterruptedException {
+        long start = System.currentTimeMillis();
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            CountDownLatch latch = new CountDownLatch(taskCount);
+            for (int i = 0; i < taskCount; i++) {
+                executor.submit(() -> {
+                    try { Thread.sleep(simulatedIoMillis); } catch (InterruptedException ignored) {}
+                    latch.countDown();
+                });
+            }
+            latch.await();
+        }
+        return new ThreadBenchmarkResult("virtual", taskCount, System.currentTimeMillis() - start, taskCount);
+    }
+
+    public static ThreadBenchmarkResult benchmarkPlatformThreads(int taskCount, int simulatedIoMillis, int poolSize) throws InterruptedException {
+        long start = System.currentTimeMillis();
+        try (ExecutorService executor = Executors.newFixedThreadPool(poolSize)) {
+            CountDownLatch latch = new CountDownLatch(taskCount);
+            for (int i = 0; i < taskCount; i++) {
+                executor.submit(() -> {
+                    try { Thread.sleep(simulatedIoMillis); } catch (InterruptedException ignored) {}
+                    latch.countDown();
+                });
+            }
+            latch.await();
+        }
+        return new ThreadBenchmarkResult("platform", taskCount, System.currentTimeMillis() - start, poolSize);
+    }
+
     // ── Thread-local storage (Concept #17) ────────────────────────────────────
 
     private static final ThreadLocal<String> EXECUTION_CONTEXT = ThreadLocal.withInitial(() -> "default");
