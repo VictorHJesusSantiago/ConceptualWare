@@ -282,12 +282,20 @@ public class TransformerAttention {
                 tokenized.add(tokens);
             }
 
+            // Delimitador para codificar pares (token1 + DELIM + token2) precisa ser
+            // um caractere que NUNCA apareça dentro de um token — usar " " (espaço)
+            // quebrava quando o corpus continha a própria letra espaço como caractere
+            // (ex.: "hello world"), pois um token podia ser literalmente " ", colidindo
+            // com o separador e corrompendo o split (String.split remove strings
+            // vazias no final, produzindo menos partes que o esperado).
+            final String PAIR_DELIM = "";
+
             while (vocab.size() < targetVocabSize) {
                 // Count pairs
                 Map<String, Integer> pairCounts = new HashMap<>();
                 for (var word : tokenized) {
                     for (int i = 0; i < word.size() - 1; i++) {
-                        String pair = word.get(i) + " " + word.get(i+1);
+                        String pair = word.get(i) + PAIR_DELIM + word.get(i+1);
                         pairCounts.merge(pair, 1, Integer::sum);
                     }
                 }
@@ -296,7 +304,7 @@ public class TransformerAttention {
                 // Find best pair
                 String bestPair = pairCounts.entrySet().stream()
                     .max(Map.Entry.comparingByValue()).get().getKey();
-                String[] parts = bestPair.split(" ");
+                String[] parts = bestPair.split(PAIR_DELIM, -1);
                 String merged = parts[0] + parts[1];
                 vocab.put(merged, id++);
                 mergeRules.add(parts);
