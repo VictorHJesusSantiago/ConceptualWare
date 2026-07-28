@@ -363,14 +363,18 @@ public class SqlConceptsService {
     /** OLAP query: full table scan aggregate (seconds on large data). */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> olapQuery() {
+        // COALESCE nos agregados: SUM/AVG/MIN/MAX de um grupo vazio (departamento
+        // sem funcionários, via LEFT JOIN) retornam NULL por semântica SQL — COUNT
+        // retorna 0 corretamente. Sem COALESCE, um departamento vazio quebraria
+        // qualquer consumidor que espere um número em vez de NULL.
         return jdbc.queryForList("""
             SELECT
                 d.name AS department,
-                COUNT(e.id)        AS employee_count,
-                SUM(e.salary)      AS total_payroll,
-                AVG(e.salary)      AS avg_salary,
-                MIN(e.salary)      AS min_salary,
-                MAX(e.salary)      AS max_salary,
+                COUNT(e.id)                   AS employee_count,
+                COALESCE(SUM(e.salary), 0)    AS total_payroll,
+                COALESCE(AVG(e.salary), 0)    AS avg_salary,
+                COALESCE(MIN(e.salary), 0)    AS min_salary,
+                COALESCE(MAX(e.salary), 0)    AS max_salary,
                 COUNT(DISTINCT ep.project_id) AS projects
             FROM departments d
             LEFT JOIN employees e        ON d.id = e.department_id
