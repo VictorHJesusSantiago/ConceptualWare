@@ -3,7 +3,6 @@ package com.conceptualware.api.rest;
 import com.conceptualware.infrastructure.persistence.UserRepository;
 import com.conceptualware.infrastructure.observability.MetricsService;
 import io.micrometer.core.annotation.Timed;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -37,8 +36,8 @@ public class UserController {
         return userRepository.findById(principal.getName())
             .map(user -> ResponseEntity.ok(Map.of(
                 "id",               user.getId(),
-                "username",         user.getUsername().value(),
-                "email",            user.getEmail().value(),
+                "username",         user.getUsername(),
+                "email",            user.getEmail(),
                 "roles",            user.getRoles(),
                 "skillLevel",       user.getSkillLevel(),
                 "totalPoints",      user.getTotalPoints(),
@@ -55,7 +54,7 @@ public class UserController {
     @Timed("api.users.leaderboard")
     public ResponseEntity<?> getLeaderboard(@RequestParam(defaultValue = "10") int limit) {
         int safeLimit = Math.min(Math.max(limit, 1), 100);
-        List<?> leaderboard = userRepository.findTopByTotalPoints(PageRequest.of(0, safeLimit));
+        List<?> leaderboard = userRepository.findTopUsers(safeLimit);
         return ResponseEntity.ok(Map.of("items", leaderboard, "limit", safeLimit));
     }
 
@@ -87,7 +86,7 @@ public class UserController {
     @GetMapping("/stats")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> getStats() {
-        List<?> stats = userRepository.countBySkillLevel();
+        List<?> stats = userRepository.getSkillLevelStats();
         return ResponseEntity.ok(Map.of("skillLevelDistribution", stats));
     }
 
