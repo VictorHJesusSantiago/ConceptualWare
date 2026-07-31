@@ -8,17 +8,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Concept #12 — DDD: Application Service — orquestra o agregado, garante
- * atomicidade (@Transactional) e publica eventos de domínio via Outbox
- * simplificado (ver DomainEventPublisher).
- */
 @Service
 @RequiredArgsConstructor
 public class ConceptProgressApplicationService {
 
     private static final int TOTAL_CONCEPTS_IN_CATALOG = 800;
-    private static final int MIN_CONCEPTS_FOR_CERTIFICATE = 640; // 80% do catálogo
+    private static final int MIN_CONCEPTS_FOR_CERTIFICATE = 640;
 
     private final ConceptProgressRepository repository;
     private final DomainEventPublisher eventPublisher;
