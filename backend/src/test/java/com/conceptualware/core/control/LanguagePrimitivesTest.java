@@ -9,13 +9,8 @@ import java.util.NoSuchElementException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Tests for Language Primitives: assert/DbC, generators (Iterator), Symbol, goto-equivalents.
- */
 @DisplayName("Language Primitives")
 class LanguagePrimitivesTest {
-
-    // ── Design by Contract ─────────────────────────────────────────────────────
 
     @Test
     @DisplayName("DbC: valid withdrawal satisfies postcondition and invariant")
@@ -39,8 +34,6 @@ class LanguagePrimitivesTest {
         assertThrows(AssertionError.class, () -> account.withdraw(200));
     }
 
-    // ── Fibonacci Generator ────────────────────────────────────────────────────
-
     @Test
     @DisplayName("FibonacciGenerator: first ten values are correct")
     void testFibonacciFirst10() {
@@ -62,8 +55,6 @@ class LanguagePrimitivesTest {
         }
         assertEquals(100, gen.produced());
     }
-
-    // ── Range Generator ───────────────────────────────────────────────────────
 
     @Test
     @DisplayName("RangeGenerator: step=1 produces correct values")
@@ -90,8 +81,6 @@ class LanguagePrimitivesTest {
             () -> new LanguagePrimitives.RangeGenerator(0, 10, 0));
     }
 
-    // ── Prime Generator ───────────────────────────────────────────────────────
-
     @Test
     @DisplayName("PrimeGenerator: first 10 primes are correct")
     void testFirstTenPrimes() {
@@ -112,8 +101,6 @@ class LanguagePrimitivesTest {
         );
         assertEquals(List.of(2, 3, 5, 7, 11, 13, 17, 19, 23, 29), result);
     }
-
-    // ── Symbol ────────────────────────────────────────────────────────────────
 
     @Test
     @DisplayName("Symbol: two locally created symbols are never equal")
@@ -147,8 +134,6 @@ class LanguagePrimitivesTest {
         var err = LanguagePrimitives.Tagged.error("fail");
         assertNotSame(ok.tag(), err.tag());
     }
-
-    // ── Goto Equivalents ──────────────────────────────────────────────────────
 
     @Test
     @DisplayName("GotoEquivalents: matrix search finds correct cell")

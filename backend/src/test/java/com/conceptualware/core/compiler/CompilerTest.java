@@ -7,10 +7,6 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
 
-/**
- * Tests for Concept #10 — Compiler / Interpreter Pipeline:
- *   Lexer → Parser → AST → SemanticAnalyzer → IRGenerator → Optimizer → Interpreter
- */
 @DisplayName("Category 10 — Compiler/Interpreter Pipeline")
 class CompilerTest {
 
@@ -144,7 +140,6 @@ class CompilerTest {
 
         @Test @DisplayName("binary ops respect precedence")
         void parsesPrecedence() {
-            // 2 + 3 * 4 should parse as 2 + (3 * 4), not (2+3) * 4
             var prog = parse("var x = 2 + 3 * 4;");
             var decl = (AST.Stmt.VarDecl) prog.body().get(0);
             var add = (AST.Expr.BinaryOp) decl.initializer();
@@ -207,7 +202,7 @@ class CompilerTest {
         @Test @DisplayName("allows int-to-float widening")
         void allowsWidening() {
             var result = analyze("var x: float = 42;");
-            assertThat(result.hasErrors()).isFalse(); // int → float is ok
+            assertThat(result.hasErrors()).isFalse();
         }
 
         @Test @DisplayName("detects break outside loop")
@@ -249,7 +244,6 @@ class CompilerTest {
         @Test @DisplayName("generates while loop structure")
         void generatesWhile() {
             var ir = generateIR("while (i > 0) { i = i - 1; }");
-            // Head label + conditional goto + body + goto head + exit label
             long labels = ir.stream().filter(i -> i instanceof IR.Label).count();
             assertThat(labels).isGreaterThanOrEqualTo(2);
         }
@@ -267,17 +261,12 @@ class CompilerTest {
 
         @Test @DisplayName("constant folding: 3 + 4 → 7")
         void constantFolding() {
-            // t0 precisa ser "usado" (aqui, por Print) — senão o DCE, corretamente,
-            // elimina o resultado dobrado por ninguém referenciar t0 depois.
             List<IR> ir = List.of(
                 new IR.BinOp("t0", "3", "+", "4"),
                 new IR.Print("t0")
             );
             var stats = new Optimizer().optimize(ir);
             assertThat(stats.constantsFolded()).isGreaterThan(0);
-            // Após fold + propagação + DCE (que roda na mesma iteração), o valor "7"
-            // acaba propagado diretamente para o Print — o Copy intermediário t0=7
-            // é corretamente eliminado por ser código morto (t0 não é mais lido).
             assertThat(stats.optimizedIR().stream()
                 .anyMatch(i -> i instanceof IR.Print p && p.value().equals("7")))
                 .isTrue();
@@ -301,7 +290,7 @@ class CompilerTest {
         void commonSubexpressionElimination() {
             List<IR> ir = List.of(
                 new IR.BinOp("t0", "a", "+", "b"),
-                new IR.BinOp("t1", "a", "+", "b")  // same expression
+                new IR.BinOp("t1", "a", "+", "b")
             );
             var stats = new Optimizer().optimize(ir);
             assertThat(stats.cseSubstitutions()).isGreaterThan(0);
@@ -310,8 +299,8 @@ class CompilerTest {
         @Test @DisplayName("optimization stats report")
         void statsReport() {
             List<IR> ir = List.of(
-                new IR.BinOp("t0", "2", "*", "3"),  // constant fold
-                new IR.BinOp("t1", "t0", "+", "0")  // algebraic simplify
+                new IR.BinOp("t0", "2", "*", "3"),
+                new IR.BinOp("t1", "t0", "+", "0")
             );
             var stats = new Optimizer().optimize(ir);
             assertThat(stats.totalSavings()).isGreaterThan(0);
