@@ -1,11 +1,5 @@
 package com.conceptualware.core.datastructures.tree;
 
-/**
- * Concept #4 — Árvore de Segmento (Segment Tree) e Fenwick Tree (BIT)
- *   - Range queries (sum/min/max) in O(log n)
- *   - Point updates in O(log n)
- * Concept #5 — Algoritmos de consulta em intervalo
- */
 public class SegmentTree {
 
     private final int[] tree;
@@ -42,7 +36,6 @@ public class SegmentTree {
         tree[node] = combine(tree[2*node+1], tree[2*node+2]);
     }
 
-    /** Range query [l, r] inclusive. */
     public int query(int l, int r) { return query(0, 0, n - 1, l, r); }
 
     private int query(int node, int start, int end, int l, int r) {
@@ -69,8 +62,6 @@ public class SegmentTree {
         };
     }
 
-    // ── Fenwick Tree (Binary Indexed Tree) ────────────────────────────────────
-
     public static class FenwickTree {
         private final int[] bit;
         private final int n;
@@ -86,22 +77,18 @@ public class SegmentTree {
             for (int i = 0; i < n; i++) update(i + 1, data[i]);
         }
 
-        /** Point update: add delta to index i (1-indexed). */
         public void update(int i, int delta) {
             for (; i <= n; i += i & (-i)) bit[i] += delta;
         }
 
-        /** Prefix sum [1..i] (1-indexed). */
         public int prefixSum(int i) {
             int sum = 0;
             for (; i > 0; i -= i & (-i)) sum += bit[i];
             return sum;
         }
 
-        /** Range sum [l..r] (1-indexed). */
         public int rangeSum(int l, int r) { return prefixSum(r) - prefixSum(l - 1); }
 
-        /** Point query at index i. */
         public int query(int i) { return rangeSum(i, i); }
     }
 }
