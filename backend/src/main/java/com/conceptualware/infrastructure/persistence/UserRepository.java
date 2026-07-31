@@ -10,12 +10,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Concept #11 — Banco de Dados: MongoDB Repository, Query, Aggregation
- *   Índices (unique), Operações DML via Spring Data abstraction
- * Concept #12 — DDD: Repository Pattern — abstracts persistence from domain
- * Concept #14 — DIP: High-level modules depend on abstraction, not implementation
- */
 @Repository
 public interface UserRepository extends MongoRepository<User, String> {
 
@@ -24,7 +18,6 @@ public interface UserRepository extends MongoRepository<User, String> {
     boolean existsByEmail(String email);
     boolean existsByUsername(String username);
 
-    // MongoDB Query — Concept #11
     @Query("{ 'roles': ?0, 'status': 'ACTIVE' }")
     List<User> findActiveByRole(String role);
 
@@ -34,7 +27,6 @@ public interface UserRepository extends MongoRepository<User, String> {
     @Query("{ 'skillLevel': ?0 }")
     List<User> findBySkillLevel(String skillLevel);
 
-    // MongoDB Aggregation — leaderboard (Window Functions concept — Concept #11)
     @Aggregation(pipeline = {
         "{ $match: { 'status': 'ACTIVE' } }",
         "{ $sort: { 'totalPoints': -1 } }",
@@ -43,7 +35,6 @@ public interface UserRepository extends MongoRepository<User, String> {
     })
     List<User> findTopUsers(int limit);
 
-    // Aggregation for stats
     @Aggregation(pipeline = {
         "{ $group: { _id: '$skillLevel', count: { $sum: 1 }, avgPoints: { $avg: '$totalPoints' } } }",
         "{ $sort: { 'avgPoints': -1 } }"
