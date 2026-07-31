@@ -10,69 +10,27 @@ import java.security.Key;
 import java.time.Instant;
 import java.util.*;
 
-/**
- * Concept #21 — Zero Trust Architecture:
- *
- *   Zero Trust Principles (BeyondCorp, NIST SP 800-207):
- *     1. "Never trust, always verify" — no implicit trust based on network location.
- *     2. Assume breach — treat every request as if from an untrusted network.
- *     3. Least privilege — each service gets only minimum permissions needed.
- *     4. Verify explicitly — authenticate and authorize every request.
- *     5. Use strong identity — certificates, JWTs, mTLS for service-to-service.
- *
- *   Service-to-Service Authentication:
- *     - Each service has its own identity (JWT or mTLS certificate).
- *     - Service A → Service B: A presents its JWT, B validates signature + claims.
- *     - Never hardcode credentials; use SPIFFE/SPIRE or Vault for dynamic creds.
- *
- *   Context-aware access (ABAC vs RBAC):
- *     RBAC: access based on role (admin, user, readonly).
- *     ABAC: access based on attributes (role + department + time + location + device health).
- *
- *   Key Rotation:
- *     - JWT signing keys must be rotated regularly (NIST recommends ≤ 90 days).
- *     - JWKS (JSON Web Key Set): publish public keys at /.well-known/jwks.json.
- *     - Rotation: generate new key → sign new tokens → keep old key for verification
- *       during transition → retire old key after all old tokens expire.
- *
- *   SBOM (Software Bill of Materials):
- *     - Inventory of all components in your software (libraries, licenses, versions).
- *     - Formats: CycloneDX (JSON), SPDX (text/JSON).
- *     - Required by US Executive Order 14028 (May 2021) for federal software.
- *
- * Concept #21 — Zero Trust, key management, supply chain security
- */
 @Service
 public class ZeroTrustService {
 
     private static final Logger log = LoggerFactory.getLogger(ZeroTrustService.class);
 
-    // ── Service Identity JWT ──────────────────────────────────────────────────
-
-    /**
-     * Service token: short-lived JWT used for service-to-service authentication.
-     * Issued by a central identity authority (like HashiCorp Vault or AWS IAM).
-     */
     public static String issueServiceToken(String serviceName, String audience, Key signingKey) {
         Instant now    = Instant.now();
-        Instant expiry = now.plusSeconds(300); // 5-minute token — short-lived by design
+        Instant expiry = now.plusSeconds(300);
 
         return Jwts.builder()
             .setSubject(serviceName)
             .setAudience(audience)
             .setIssuedAt(Date.from(now))
             .setExpiration(Date.from(expiry))
-            .setId(UUID.randomUUID().toString()) // unique JTI for replay prevention
+            .setId(UUID.randomUUID().toString())
             .claim("type",    "service")
             .claim("version", "1.0")
             .signWith(signingKey, SignatureAlgorithm.HS256)
             .compact();
     }
 
-    /**
-     * Verify a service token: "never trust, always verify."
-     * Validates: signature, expiry, audience, issuer, type claim.
-     */
     public static ServiceTokenClaims verifyServiceToken(String token, String expectedAudience,
                                                           Key verifyKey) {
         try {
@@ -82,9 +40,6 @@ public class ZeroTrustService {
                 .parseSignedClaims(token)
                 .getPayload();
 
-            // "Never trust, always verify": mismatch de audiência/tipo é rejeição
-            // esperada do protocolo, não uma condição excepcional — retorna claims
-            // inválidas (valid=false) em vez de propagar exceção não capturada.
             if (!claims.getAudience().contains(expectedAudience)) {
                 return ServiceTokenClaims.failed("Audience mismatch — expected " + expectedAudience);
             }
@@ -92,7 +47,6 @@ public class ZeroTrustService {
                 return ServiceTokenClaims.failed("Token type mismatch — expected service token");
             }
 
-            // JJWT 0.12.x: getAudience() retorna Set<String> (multi-audiência) — pegamos o primeiro valor.
             String audience = claims.getAudience().stream().findFirst().orElse(null);
 
             return new ServiceTokenClaims(
@@ -124,29 +78,14 @@ public class ZeroTrustService {
         }
     }
 
-    // ── Key Rotation ──────────────────────────────────────────────────────────
-
-    /**
-     * Key rotation manager: maintains multiple keys (current + previous).
-     * - Current key: signs new tokens.
-     * - Previous key(s): still valid for verifying tokens issued before rotation.
-     * - Keys are retired after their associated tokens expire.
-     */
     public static class KeyRotationManager {
 
         private record KeyVersion(String keyId, Key key, Instant createdAt, Instant retireAt) {}
 
         private final Deque<KeyVersion> keys = new ArrayDeque<>();
         private static final int MAX_KEY_AGE_DAYS = 90;
-        // Contador monotônico — Instant.now().toEpochMilli() sozinho colide quando
-        // duas chaves são geradas dentro do mesmo milissegundo (ex.: construtor
-        // seguido imediatamente de generateNewKey() no mesmo teste).
         private final java.util.concurrent.atomic.AtomicLong keySeq = new java.util.concurrent.atomic.AtomicLong();
 
-        // O manager sempre começa com uma chave ativa (documentado na classe).
-        // activeKeyCount() lia keys.size() diretamente sem lazy-init — retornava 0
-        // antes de qualquer chamada a currentKey()/currentKeyId(), quebrando o
-        // invariante "starts with one active key".
         public KeyRotationManager() {
             generateNewKey();
         }
@@ -159,7 +98,6 @@ public class ZeroTrustService {
             log.info("New signing key generated: {}", keyId);
         }
 
-        /** Current key for signing new tokens. */
         public synchronized Key currentKey() {
             if (keys.isEmpty()) generateNewKey();
             return keys.peekFirst().key();
@@ -170,7 +108,6 @@ public class ZeroTrustService {
             return keys.peekFirst().keyId();
         }
 
-        /** Find key by ID for verification (allows verifying tokens from previous key). */
         public synchronized Optional<Key> findKey(String keyId) {
             return keys.stream()
                 .filter(k -> k.keyId().equals(keyId))
@@ -178,7 +115,6 @@ public class ZeroTrustService {
                 .findFirst();
         }
 
-        /** Retire expired keys (called by @Scheduled task). */
         public synchronized void retireExpiredKeys() {
             Instant now = Instant.now();
             int removed = 0;
@@ -193,14 +129,12 @@ public class ZeroTrustService {
         public synchronized int activeKeyCount() { return keys.size(); }
     }
 
-    // ── ABAC (Attribute-Based Access Control) ─────────────────────────────────
-
     public record AccessContext(
         String userId,
         Set<String> roles,
         String department,
         String ipAddress,
-        String deviceTrustLevel,  // "managed", "personal", "unknown"
+        String deviceTrustLevel,
         Instant requestTime,
         String resource,
         String action
@@ -208,31 +142,22 @@ public class ZeroTrustService {
 
     public enum TrustLevel { DENY, LOW, MEDIUM, HIGH }
 
-    /**
-     * Zero Trust access evaluation: combines multiple signals to determine access.
-     * More signals = higher trust level = more access allowed.
-     */
     public static TrustLevel evaluateAccess(AccessContext ctx) {
         int score = 0;
 
-        // Network risk signals
-        if (isInternalIp(ctx.ipAddress())) score += 1;  // internal ≠ trusted in ZT, but lowers risk slightly
+        if (isInternalIp(ctx.ipAddress())) score += 1;
 
-        // Identity strength
         if (ctx.roles().contains("verified-mfa")) score += 2;
 
-        // Device trust
         score += switch (ctx.deviceTrustLevel()) {
-            case "managed"  -> 3; // corporate MDM-enrolled device
-            case "personal" -> 1; // BYOD with Endpoint Protection
-            default         -> 0; // unknown device
+            case "managed"  -> 3;
+            case "personal" -> 1;
+            default         -> 0;
         };
 
-        // Time-of-day risk (simple example — production would use ML)
         int hour = ctx.requestTime().atZone(java.time.ZoneId.of("UTC")).getHour();
-        if (hour >= 8 && hour <= 18) score += 1; // business hours
+        if (hour >= 8 && hour <= 18) score += 1;
 
-        // Map score to trust level
         if      (score >= 6) return TrustLevel.HIGH;
         else if (score >= 4) return TrustLevel.MEDIUM;
         else if (score >= 2) return TrustLevel.LOW;
@@ -244,25 +169,18 @@ public class ZeroTrustService {
         return ip.startsWith("10.") || ip.startsWith("192.168.") || ip.startsWith("172.");
     }
 
-    // ── SBOM Generation ───────────────────────────────────────────────────────
-
-    /**
-     * SBOM (Software Bill of Materials) in CycloneDX format.
-     * Lists all dependencies with name, version, license, and vulnerability info.
-     * Required for: US Federal Software (EO 14028), EU Cyber Resilience Act.
-     */
     public record SbomComponent(
         String name,
         String version,
-        String type,      // "library", "framework", "runtime"
+        String type,
         String license,
-        String purl,      // Package URL: pkg:maven/group:artifact@version
+        String purl,
         List<String> knownCves
     ) {}
 
     public record SbomDocument(
-        String bomFormat,     // "CycloneDX"
-        String specVersion,   // "1.5"
+        String bomFormat,
+        String specVersion,
         String serialNumber,
         Instant timestamp,
         String applicationName,
@@ -297,17 +215,14 @@ public class ZeroTrustService {
         }
     }
 
-    // ── Least Privilege Principle ─────────────────────────────────────────────
-
     public record ServicePermissions(
         String serviceName,
         Set<String> allowedEndpoints,
         Set<String> allowedDatabases,
-        Set<String> allowedTopics,    // Kafka/message bus topics
+        Set<String> allowedTopics,
         boolean canWriteToDatabase,
-        boolean canReadSecrets        // access to Vault/secrets manager
+        boolean canReadSecrets
     ) {
-        /** Algorithm service: read-only, only access its own DB collection. */
         public static ServicePermissions algorithmService() {
             return new ServicePermissions(
                 "algorithm-service",

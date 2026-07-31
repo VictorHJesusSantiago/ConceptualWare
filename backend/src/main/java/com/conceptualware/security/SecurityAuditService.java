@@ -7,16 +7,6 @@ import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
-/**
- * Concept #21 — Auditoria de Segurança: registra eventos sensíveis (login
- * falho, lockout por força bruta, violação de CSP, etc.) em um ring buffer
- * in-memory para alimentar um dashboard de auditoria simples.
- *
- * Nota: em produção este buffer deveria ser persistido (ex.: coleção MongoDB
- * dedicada com TTL index, ou exportado para o pipeline ELK já presente em
- * observability/). Aqui mantemos in-memory para não adicionar infraestrutura
- * nova — é uma demonstração do conceito, não o sistema de auditoria final.
- */
 @Service
 public class SecurityAuditService {
 
