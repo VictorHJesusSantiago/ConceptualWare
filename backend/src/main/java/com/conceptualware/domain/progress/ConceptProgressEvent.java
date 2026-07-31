@@ -2,12 +2,6 @@ package com.conceptualware.domain.progress;
 
 import com.conceptualware.domain.shared.DomainEvent;
 
-/**
- * Concept #12 — DDD: Evento de domínio do bounded context "progress".
- * DomainEvent é classe abstrata (não interface/record) — ver CLAUDE.md:
- * eventos NÃO podem ser `record X(...) extends DomainEvent` (records não
- * podem estender classes em Java).
- */
 public final class ConceptProgressEvent extends DomainEvent {
 
     private final String userId;

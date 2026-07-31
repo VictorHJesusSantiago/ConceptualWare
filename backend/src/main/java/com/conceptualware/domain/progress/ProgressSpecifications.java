@@ -2,10 +2,6 @@ package com.conceptualware.domain.progress;
 
 import com.conceptualware.domain.shared.Specification;
 
-/**
- * Concept #12 — DDD: Specifications concretas para o bounded context de
- * progresso. Compostas via and/or/not (ver {@link Specification}).
- */
 public final class ProgressSpecifications {
 
     private ProgressSpecifications() {}

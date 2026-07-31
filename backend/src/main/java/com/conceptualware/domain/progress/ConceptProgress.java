@@ -13,20 +13,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-/**
- * Concept #12 — DDD: Novo Aggregate Root — "ConceptProgress" (bounded context
- * de progresso do usuário através dos 800+ conceitos do catálogo).
- *
- *   Invariante de consistência: um conceito só pode ser marcado como
- *   concluído uma vez por usuário; tentativas subsequentes incrementam
- *   attemptCount mas não duplicam o registro de conclusão.
- *
- *   Event Sourcing simplificado: além do estado atual (completedConcepts),
- *   mantemos um log append-only de "ProgressEntry" no próprio documento —
- *   suficiente para reconstituir o histórico sem precisar de um event store
- *   dedicado. Para volume alto, migrar para uma coleção `progress_events`
- *   separada replayed via `pullDomainEvents()`.
- */
 @Document(collection = "concept_progress")
 @Getter
 @NoArgsConstructor
@@ -51,7 +37,6 @@ public class ConceptProgress extends AggregateRoot {
         return new ConceptProgress(userId, totalConceptsInCatalog);
     }
 
-    /** Getter explícito com wrapper imutável — nunca expor coleção mutável via @Getter cru. */
     public Set<String> getCompletedConcepts() {
         return Collections.unmodifiableSet(completedConcepts);
     }
@@ -60,7 +45,6 @@ public class ConceptProgress extends AggregateRoot {
         return Collections.unmodifiableList(history);
     }
 
-    /** Registra a conclusão de um conceito. Idempotente — repetir não duplica nem regride. */
     public void recordConceptCompleted(String conceptSlug) {
         if (conceptSlug == null || conceptSlug.isBlank()) {
             throw new IllegalArgumentException("conceptSlug é obrigatório");
