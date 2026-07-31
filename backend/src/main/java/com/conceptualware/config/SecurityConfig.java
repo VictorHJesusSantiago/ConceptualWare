@@ -23,7 +23,6 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 
-// Concept 21 — Security: Authentication, Authorization, CORS, CSP, HSTS, BCrypt
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
@@ -31,20 +30,17 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final com.conceptualware.infrastructure.security.CsrfDoubleSubmitFilter csrfDoubleSubmitFilter;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
-            // Disable CSRF — stateless JWT API (Concept 21: CSRF awareness)
             .csrf(AbstractHttpConfigurer::disable)
 
-            // CORS configuration (Concept 16, 21)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
-            // Stateless session — JWT (Concept 21)
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-            // Security headers (Concept 21: Defense in Depth)
             .headers(headers -> headers
                 .contentSecurityPolicy(csp -> csp.policyDirectives(
                     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:"))
@@ -53,17 +49,14 @@ public class SecurityConfig {
                     .maxAgeInSeconds(31536000))
                 .referrerPolicy(r -> r.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
                 .frameOptions(frame -> frame.deny())
-                .xssProtection(xss -> xss.disable()) // CSP replaces X-XSS-Protection
+                .xssProtection(xss -> xss.disable())
             )
 
-            // Authorization rules — Principle of Least Privilege (Concept 21)
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/algorithms/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/challenges/**").permitAll()
-                // Demos stateless de conceitos (grafos, DS avançadas, strings, concorrência,
-                // padrões arquiteturais) — sem side-effects em dados de usuário, sandbox público.
                 .requestMatchers("/api/v1/core-concepts/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/security/csrf-token").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/security/csp-report").permitAll()
@@ -72,13 +65,13 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
 
-            // JWT filter before username/password filter
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+
+            .addFilterAfter(csrfDoubleSubmitFilter, JwtAuthenticationFilter.class)
 
             .build();
     }
 
-    // BCrypt password hashing — strength 12 (Concept 21: Password hashing)
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(12);

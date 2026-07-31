@@ -8,17 +8,14 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
-// Concept 17 & 18 — Concurrency: Thread Pool, Virtual Threads, Async execution
 @Configuration
 public class AsyncConfig implements AsyncConfigurer {
 
-    // Virtual Thread executor — Project Loom (Java 21) — Concept 17
     @Bean(name = "virtualThreadExecutor")
     public Executor virtualThreadExecutor() {
         return Executors.newVirtualThreadPerTaskExecutor();
     }
 
-    // Platform Thread pool for CPU-bound algorithm tasks — Concept 17
     @Bean(name = "algorithmExecutor")
     public ThreadPoolTaskExecutor algorithmExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
@@ -33,7 +30,6 @@ public class AsyncConfig implements AsyncConfigurer {
         return executor;
     }
 
-    // Default async executor uses Virtual Threads (Concept 18)
     @Override
     public Executor getAsyncExecutor() {
         return virtualThreadExecutor();
