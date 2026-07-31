@@ -2,26 +2,19 @@ package com.conceptualware.core.datastructures.tree;
 
 import java.util.*;
 
-/**
- * Concept #4 — Árvore binária, BST, heap, BFS, DFS traversals
- * Concept #5 — Busca binária em árvore, algoritmos de percurso
- * Concept #7 — OOP: generics, comparator, recursion
- */
 public class BinarySearchTree<T extends Comparable<T>> {
 
     protected static class Node<T> {
         T key;
         Node<T> left, right;
-        int height; // for AVL
-        boolean red; // for Red-Black
+        int height;
+        boolean red;
 
         Node(T key) { this.key = key; this.height = 1; this.red = true; }
     }
 
     protected Node<T> root;
     private int size;
-
-    // ── Insert ────────────────────────────────────────────────────────────────
 
     public void insert(T key) {
         root = insert(root, key);
@@ -33,11 +26,8 @@ public class BinarySearchTree<T extends Comparable<T>> {
         int cmp = key.compareTo(node.key);
         if (cmp < 0) node.left = insert(node.left, key);
         else if (cmp > 0) node.right = insert(node.right, key);
-        // Duplicate keys: ignored (set semantics)
         return node;
     }
-
-    // ── Search ────────────────────────────────────────────────────────────────
 
     public boolean contains(T key) { return contains(root, key); }
 
@@ -48,8 +38,6 @@ public class BinarySearchTree<T extends Comparable<T>> {
         if (cmp > 0) return contains(node.right, key);
         return true;
     }
-
-    // ── Delete ─────────────────────────────────────────────────────────────────
 
     public void delete(T key) {
         if (contains(key)) { root = delete(root, key); size--; }
@@ -63,15 +51,12 @@ public class BinarySearchTree<T extends Comparable<T>> {
         else {
             if (node.left == null) return node.right;
             if (node.right == null) return node.left;
-            // Replace with in-order successor (smallest in right subtree)
             Node<T> successor = min(node.right);
             node.key = successor.key;
             node.right = delete(node.right, successor.key);
         }
         return node;
     }
-
-    // ── Traversals ────────────────────────────────────────────────────────────
 
     public List<T> inOrder()   { List<T> r = new ArrayList<>(); inOrder(root, r); return r; }
     public List<T> preOrder()  { List<T> r = new ArrayList<>(); preOrder(root, r); return r; }
@@ -81,7 +66,6 @@ public class BinarySearchTree<T extends Comparable<T>> {
     private void preOrder(Node<T> n, List<T> r)  { if (n != null) { r.add(n.key); preOrder(n.left, r); preOrder(n.right, r); } }
     private void postOrder(Node<T> n, List<T> r) { if (n != null) { postOrder(n.left, r); postOrder(n.right, r); r.add(n.key); } }
 
-    /** BFS — Level-order traversal (Concept #5). */
     public List<List<T>> levelOrder() {
         List<List<T>> result = new ArrayList<>();
         if (root == null) return result;
@@ -101,8 +85,6 @@ public class BinarySearchTree<T extends Comparable<T>> {
         return result;
     }
 
-    // ── Min / Max / Height ────────────────────────────────────────────────────
-
     public T min() { if (root == null) throw new NoSuchElementException(); return min(root).key; }
     public T max() { if (root == null) throw new NoSuchElementException(); return max(root).key; }
 
@@ -115,7 +97,6 @@ public class BinarySearchTree<T extends Comparable<T>> {
     public int size() { return size; }
     public boolean isEmpty() { return root == null; }
 
-    /** Check if tree is valid BST (for testing). */
     public boolean isValidBST() {
         return isValidBST(root, null, null);
     }
@@ -127,7 +108,6 @@ public class BinarySearchTree<T extends Comparable<T>> {
         return isValidBST(n.left, min, n.key) && isValidBST(n.right, n.key, max);
     }
 
-    /** Floor: largest key ≤ given key. */
     public Optional<T> floor(T key) { return Optional.ofNullable(floor(root, key)); }
 
     private T floor(Node<T> n, T key) {
@@ -139,7 +119,6 @@ public class BinarySearchTree<T extends Comparable<T>> {
         return t != null ? t : n.key;
     }
 
-    /** Rank: how many keys are less than the given key. */
     public int rank(T key) { return rank(root, key); }
 
     private int rank(Node<T> n, T key) {
@@ -150,5 +129,5 @@ public class BinarySearchTree<T extends Comparable<T>> {
         return sizeOf(n.left);
     }
 
-    private int sizeOf(Node<T> n) { return n == null ? 0 : size; } // simplified
+    private int sizeOf(Node<T> n) { return n == null ? 0 : size; }
 }

@@ -2,31 +2,15 @@ package com.conceptualware.core.datastructures.tree;
 
 import java.util.*;
 
-/**
- * Concept #4 — B-Tree and B+Tree:
- *   B-Tree: multi-way search tree with order t (min degree).
- *     - Every node has at most 2t-1 keys and 2t children.
- *     - Every non-root node has at least t-1 keys.
- *     - All leaves at same depth → perfectly height-balanced.
- *     - O(log n) search/insert/delete. Used by: file systems (NTFS, ext4), databases (InnoDB pages).
- *
- *   B+Tree variant: stores data only in leaf nodes, linked list between leaves.
- *     - Enables efficient range scans (ORDER BY, BETWEEN).
- *     - Used by: PostgreSQL, MySQL InnoDB, SQLite.
- *
- * Both trees are critical for OLTP database index implementations (Concept #11).
- */
 public class BTree<K extends Comparable<K>> {
 
-    private final int t; // minimum degree
+    private final int t;
     private Node root;
 
     public BTree(int t) {
         this.t    = t;
         this.root = new Node(true);
     }
-
-    // ── Node ─────────────────────────────────────────────────────────────────
 
     private class Node {
         List<K>    keys     = new ArrayList<>();
@@ -38,8 +22,6 @@ public class BTree<K extends Comparable<K>> {
         boolean isFull() { return keys.size() == 2 * t - 1; }
     }
 
-    // ── Search ────────────────────────────────────────────────────────────────
-
     public boolean search(K key) { return searchNode(root, key); }
 
     private boolean searchNode(Node node, K key) {
@@ -50,8 +32,6 @@ public class BTree<K extends Comparable<K>> {
         if (node.isLeaf) return false;
         return searchNode(node.children.get(i), key);
     }
-
-    // ── Insertion ─────────────────────────────────────────────────────────────
 
     public void insert(K key) {
         if (root.isFull()) {
@@ -67,7 +47,7 @@ public class BTree<K extends Comparable<K>> {
         int i = node.keys.size() - 1;
 
         if (node.isLeaf) {
-            node.keys.add(null); // extend by one
+            node.keys.add(null);
             while (i >= 0 && key.compareTo(node.keys.get(i)) < 0) {
                 node.keys.set(i + 1, node.keys.get(i));
                 i--;
@@ -84,16 +64,13 @@ public class BTree<K extends Comparable<K>> {
         }
     }
 
-    /** Split child[i] of parent — child must be full (2t-1 keys). */
     private void splitChild(Node parent, int i) {
         Node full  = parent.children.get(i);
         Node right = new Node(full.isLeaf);
 
-        // Median key moves up to parent
         parent.keys.add(i, full.keys.get(t - 1));
         parent.children.add(i + 1, right);
 
-        // Right half of keys and children go to the new node
         right.keys.addAll(full.keys.subList(t, full.keys.size()));
         full.keys.subList(t - 1, full.keys.size()).clear();
 
@@ -102,8 +79,6 @@ public class BTree<K extends Comparable<K>> {
             full.children.subList(t, full.children.size()).clear();
         }
     }
-
-    // ── Deletion ──────────────────────────────────────────────────────────────
 
     public void delete(K key) { delete(root, key); }
 
@@ -117,7 +92,7 @@ public class BTree<K extends Comparable<K>> {
                 deleteFromInternal(node, idx);
             }
         } else {
-            if (node.isLeaf) return; // key not present
+            if (node.isLeaf) return;
             boolean lastChild = (idx == node.keys.size());
             if (node.children.get(idx).keys.size() < t) fill(node, idx);
             if (lastChild && idx > node.keys.size())
@@ -197,10 +172,8 @@ public class BTree<K extends Comparable<K>> {
         left.keys.addAll(right.keys);
         if (!right.isLeaf) left.children.addAll(right.children);
         node.children.remove(idx + 1);
-        if (root.keys.isEmpty()) root = root.children.get(0); // shrink tree height
+        if (root.keys.isEmpty()) root = root.children.get(0);
     }
-
-    // ── In-order traversal ───────────────────────────────────────────────────
 
     public List<K> inOrder() {
         List<K> result = new ArrayList<>();
@@ -216,12 +189,6 @@ public class BTree<K extends Comparable<K>> {
         if (!node.isLeaf) inOrderHelper(node.children.get(node.keys.size()), result);
     }
 
-    // ── B+Tree simulation ─────────────────────────────────────────────────────
-
-    /**
-     * BPlusTree inner class — all values at leaves, leaves linked for range scan.
-     * Demonstrates the key structural difference from B-Tree.
-     */
     public static class BPlusTree<K extends Comparable<K>, V> {
 
         private final int order;
@@ -246,12 +213,9 @@ public class BTree<K extends Comparable<K>> {
 
         public Optional<V> search(K key) { return root.search(key); }
 
-        /** Range scan: key feature of B+Tree (O(k + log n) where k = result count). */
         public List<V> rangeQuery(K from, K to) {
             return root.rangeQuery(from, to);
         }
-
-        // ── B+Tree node hierarchy ─────────────────────────────────────────────
 
         abstract static class BPlusNode<K extends Comparable<K>, V> {
             List<K> keys = new ArrayList<>();
@@ -263,21 +227,20 @@ public class BTree<K extends Comparable<K>> {
 
         static class BPlusLeaf<K extends Comparable<K>, V> extends BPlusNode<K, V> {
             List<V>         values = new ArrayList<>();
-            BPlusLeaf<K, V> next;  // linked list → range scans
+            BPlusLeaf<K, V> next;
 
             @Override
             BPlusNode<K, V> insert(K key, V value, int order) {
                 int i = 0;
                 while (i < keys.size() && key.compareTo(keys.get(i)) > 0) i++;
                 if (i < keys.size() && key.compareTo(keys.get(i)) == 0) {
-                    values.set(i, value); return null; // update
+                    values.set(i, value); return null;
                 }
                 keys.add(i, key);
                 values.add(i, value);
 
                 if (keys.size() < order) return null;
 
-                // Split leaf
                 int mid = keys.size() / 2;
                 BPlusLeaf<K, V> sibling = new BPlusLeaf<>();
                 sibling.keys.addAll(keys.subList(mid, keys.size()));

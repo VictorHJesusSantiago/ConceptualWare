@@ -1,12 +1,5 @@
 package com.conceptualware.core.datastructures.tree;
 
-/**
- * Concept #4 — Árvore AVL (autobalanceada), Red-Black implícita via rotações
- * Concept #5 — Algoritmos de balanceamento, rotações L/R/LR/RL
- *
- * AVL trees maintain |height(left) - height(right)| ≤ 1 at every node,
- * guaranteeing O(log n) search, insert, delete.
- */
 public class AVLTree<T extends Comparable<T>> extends BinarySearchTree<T> {
 
     @Override
@@ -24,7 +17,7 @@ public class AVLTree<T extends Comparable<T>> extends BinarySearchTree<T> {
         int cmp = key.compareTo(node.key);
         if      (cmp < 0) node.left  = insertAVL(node.left, key);
         else if (cmp > 0) node.right = insertAVL(node.right, key);
-        else              return node; // duplicate
+        else              return node;
 
         updateHeight(node);
         return balance(node);
@@ -57,20 +50,17 @@ public class AVLTree<T extends Comparable<T>> extends BinarySearchTree<T> {
     private Node<T> balance(Node<T> n) {
         int bf = balanceFactor(n);
 
-        // Left-heavy
         if (bf > 1) {
-            if (balanceFactor(n.left) < 0) n.left = rotateLeft(n.left); // LR case
+            if (balanceFactor(n.left) < 0) n.left = rotateLeft(n.left);
             return rotateRight(n);
         }
-        // Right-heavy
         if (bf < -1) {
-            if (balanceFactor(n.right) > 0) n.right = rotateRight(n.right); // RL case
+            if (balanceFactor(n.right) > 0) n.right = rotateRight(n.right);
             return rotateLeft(n);
         }
         return n;
     }
 
-    /** Right rotation — fixes left-heavy imbalance. */
     private Node<T> rotateRight(Node<T> y) {
         Node<T> x = y.left;
         Node<T> T2 = x.right;
@@ -81,7 +71,6 @@ public class AVLTree<T extends Comparable<T>> extends BinarySearchTree<T> {
         return x;
     }
 
-    /** Left rotation — fixes right-heavy imbalance. */
     private Node<T> rotateLeft(Node<T> x) {
         Node<T> y  = x.right;
         Node<T> T2 = y.left;
