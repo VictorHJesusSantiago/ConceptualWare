@@ -17,13 +17,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
 
-/**
- * Concept #25 — REST API: Resource, Endpoints, HTTP Methods, Status Codes,
- *   Headers, Request/Response Body, Idempotência, Paginação
- * Concept #16 — HTTP: GET/POST/PUT/PATCH/DELETE, status codes 2xx/4xx/5xx
- * Concept #14 — Clean Code: Guard clauses, early return, naming
- * Concept #29 — Clean Code: Funções pequenas, responsabilidade única
- */
 @RestController
 @RequestMapping("/api/v1/algorithms")
 @RequiredArgsConstructor
@@ -31,8 +24,6 @@ import java.util.concurrent.CompletableFuture;
 public class AlgorithmController {
 
     private final AlgorithmApplicationService algorithmService;
-
-    // ── GET /api/v1/algorithms ─────────────────────────────────────────────────
 
     @GetMapping
     public ResponseEntity<Page<Algorithm>> listAlgorithms(
@@ -55,8 +46,6 @@ public class AlgorithmController {
         return ResponseEntity.ok(result);
     }
 
-    // ── GET /api/v1/algorithms/search ─────────────────────────────────────────
-
     @GetMapping("/search")
     public ResponseEntity<Page<Algorithm>> searchAlgorithms(
         @RequestParam @NotBlank @Size(min = 2, max = 100) String q,
@@ -66,16 +55,12 @@ public class AlgorithmController {
         return ResponseEntity.ok(algorithmService.search(q, PageRequest.of(page, size)));
     }
 
-    // ── GET /api/v1/algorithms/{slug} ────────────────────────────────────────
-
     @GetMapping("/{slug}")
     public ResponseEntity<Algorithm> getAlgorithm(@PathVariable @NotBlank String slug) {
         return algorithmService.findBySlug(slug)
             .map(ResponseEntity::ok)
             .orElse(ResponseEntity.notFound().build());
     }
-
-    // ── POST /api/v1/algorithms/{slug}/execute ────────────────────────────────
 
     @PostMapping("/{slug}/execute")
     public CompletableFuture<ResponseEntity<AlgorithmApplicationService.ExecutionResult>>
@@ -92,8 +77,6 @@ public class AlgorithmController {
             .exceptionally(ex -> ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).build());
     }
 
-    // ── POST /api/v1/algorithms/{slug}/dp ────────────────────────────────────
-
     @PostMapping("/{slug}/dp")
     public ResponseEntity<AlgorithmApplicationService.DpResult> solveDp(
         @PathVariable String slug,
@@ -102,8 +85,6 @@ public class AlgorithmController {
         var result = algorithmService.solveDpProblem(slug, (Object[]) request.args());
         return ResponseEntity.ok(result);
     }
-
-    // ── Admin only: POST /api/v1/algorithms ──────────────────────────────────
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -117,8 +98,6 @@ public class AlgorithmController {
         );
         return algorithmService.save(algorithm);
     }
-
-    // ── Request / Response DTOs ───────────────────────────────────────────────
 
     public record ExecutionRequest(
         @NotNull @Size(min = 1, max = 10000) int[] input
