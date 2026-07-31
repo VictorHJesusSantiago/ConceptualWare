@@ -6,27 +6,8 @@ import java.math.BigInteger;
 import java.util.*;
 import java.util.stream.IntStream;
 
-/**
- * MathEngine — mathematical foundations for computer science.
- *
- * Covers Concept #28:
- *   - Sistemas de numeração (binário, octal, decimal, hexadecimal)
- *   - IEEE 754, overflow, rounding errors
- *   - Teoria dos números: MDC, MMC, primos, aritmética modular
- *   - Combinatória: permutação, combinação, arranjo
- *   - Probabilidade & estatística
- *   - Teoria dos grafos (matemática)
- *   - Teoria da informação: entropia de Shannon
- *   - Código de Hamming
- *   - Autômatos, P vs NP (conceitos)
- *   - Descida do gradiente (para ML — Concept #30)
- */
 @Component
 public class MathEngine {
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // §1 — Sistemas de Numeração
-    // ─────────────────────────────────────────────────────────────────────────
 
     public String decimalToBinary(long n)  { return Long.toBinaryString(n); }
     public String decimalToOctal(long n)   { return Long.toOctalString(n); }
@@ -36,23 +17,16 @@ public class MathEngine {
     public long octalToDecimal(String oct)   { return Long.parseLong(oct, 8); }
     public long hexToDecimal(String hex)     { return Long.parseLong(hex, 16); }
 
-    // Convert between any two bases
     public String convertBase(String number, int fromBase, int toBase) {
         long decimal = Long.parseLong(number, fromBase);
         return Long.toString(decimal, toBase).toUpperCase();
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // §2 — IEEE 754 Ponto Flutuante
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /** Demonstrates floating-point rounding error (IEEE 754). */
     public boolean floatingPointError() {
-        double result = 0.1 + 0.2; // Should be 0.3 but isn't in IEEE 754
-        return result == 0.3; // false — this is the classic FP error
+        double result = 0.1 + 0.2;
+        return result == 0.3;
     }
 
-    /** Safe float comparison using epsilon. */
     public boolean floatEquals(double a, double b, double epsilon) {
         return Math.abs(a - b) < epsilon;
     }
@@ -66,22 +40,15 @@ public class MathEngine {
             sign, exponent, exponent - 127, Integer.toBinaryString(mantissa));
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // §3 — Teoria dos Números
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /** Greatest Common Divisor — Euclidean Algorithm. */
     public long gcd(long a, long b) {
         while (b != 0) { long t = b; b = a % b; a = t; }
         return a;
     }
 
-    /** Least Common Multiple. */
     public long lcm(long a, long b) {
         return a / gcd(a, b) * b;
     }
 
-    /** Sieve of Eratosthenes — find all primes up to n. */
     public List<Integer> sieveOfEratosthenes(int n) {
         boolean[] isComposite = new boolean[n + 1];
         List<Integer> primes = new ArrayList<>();
@@ -106,7 +73,6 @@ public class MathEngine {
         return true;
     }
 
-    /** Fast modular exponentiation: base^exp mod m. */
     public long modPow(long base, long exp, long mod) {
         long result = 1;
         base %= mod;
@@ -118,14 +84,9 @@ public class MathEngine {
         return result;
     }
 
-    /** Modular inverse using Fermat's little theorem (mod must be prime). */
     public long modInverse(long a, long mod) {
         return modPow(a, mod - 2, mod);
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // §4 — Combinatória
-    // ─────────────────────────────────────────────────────────────────────────
 
     public long factorial(int n) {
         if (n < 0) throw new IllegalArgumentException("Factorial of negative");
@@ -134,11 +95,10 @@ public class MathEngine {
         return result;
     }
 
-    /** C(n,k) — combination (binomial coefficient). */
     public long combination(int n, int k) {
         if (k > n || k < 0) return 0;
         if (k == 0 || k == n) return 1;
-        k = Math.min(k, n - k); // symmetry
+        k = Math.min(k, n - k);
         long result = 1;
         for (int i = 0; i < k; i++) {
             result = result * (n - i) / (i + 1);
@@ -146,7 +106,6 @@ public class MathEngine {
         return result;
     }
 
-    /** P(n,k) — permutation. */
     public long permutation(int n, int k) {
         if (k > n) return 0;
         long result = 1;
@@ -154,14 +113,9 @@ public class MathEngine {
         return result;
     }
 
-    /** Inclusion-exclusion principle: |A ∪ B| = |A| + |B| - |A ∩ B|. */
     public int inclusionExclusion(int sizeA, int sizeB, int sizeIntersection) {
         return sizeA + sizeB - sizeIntersection;
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // §5 — Estatística
-    // ─────────────────────────────────────────────────────────────────────────
 
     public record Statistics(double mean, double median, double mode,
                               double variance, double stdDev, double min, double max) {}
@@ -184,7 +138,6 @@ public class MathEngine {
         for (double d : data) varianceSum += (d - mean) * (d - mean);
         double variance = varianceSum / data.length;
 
-        // Mode: value that appears most
         Map<Double, Long> freq = new HashMap<>();
         for (double d : data) freq.merge(d, 1L, Long::sum);
         double mode = freq.entrySet().stream()
@@ -194,7 +147,6 @@ public class MathEngine {
         return new Statistics(mean, median, mode, variance, Math.sqrt(variance), min, max);
     }
 
-    /** Pearson correlation coefficient. */
     public double correlation(double[] x, double[] y) {
         if (x.length != y.length) throw new IllegalArgumentException("Arrays must have same length");
         Statistics sx = computeStatistics(x);
@@ -205,11 +157,6 @@ public class MathEngine {
         return cov / (sx.stdDev() * sy.stdDev());
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // §6 — Teoria da Informação: Entropia de Shannon
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /** Shannon entropy H(X) = -Σ p(x) * log2(p(x)). */
     public double shannonEntropy(Map<String, Double> probabilities) {
         double entropy = 0;
         for (double p : probabilities.values()) {
@@ -218,7 +165,6 @@ public class MathEngine {
         return entropy;
     }
 
-    /** Compute symbol frequencies and normalize to probabilities. */
     public Map<Character, Double> computeProbabilities(String text) {
         Map<Character, Integer> freq = new LinkedHashMap<>();
         for (char c : text.toCharArray()) freq.merge(c, 1, Integer::sum);
@@ -228,22 +174,17 @@ public class MathEngine {
         return probs;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // §7 — Código de Hamming (detecção e correção de erros)
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /** Encode data bits with Hamming error-correction parity bits. */
     public int[] hammingEncode(int[] dataBits) {
         int m = dataBits.length;
         int r = 0;
         while ((1 << r) < m + r + 1) r++;
 
         int totalBits = m + r;
-        int[] encoded = new int[totalBits + 1]; // 1-indexed
+        int[] encoded = new int[totalBits + 1];
         int dataIdx = 0;
 
         for (int i = 1; i <= totalBits; i++) {
-            if ((i & (i - 1)) != 0) { // Not a power of 2 → data bit
+            if ((i & (i - 1)) != 0) {
                 encoded[i] = dataBits[dataIdx++];
             }
         }
@@ -258,7 +199,6 @@ public class MathEngine {
         return encoded;
     }
 
-    /** Detect and correct single-bit error in Hamming-encoded word. */
     public int detectAndCorrect(int[] encoded) {
         int syndrome = 0;
         for (int i = 0; (1 << i) < encoded.length; i++) {
@@ -270,18 +210,13 @@ public class MathEngine {
             if (parity != 0) syndrome += parityPos;
         }
         if (syndrome > 0 && syndrome < encoded.length) {
-            encoded[syndrome] ^= 1; // Flip the erroneous bit
+            encoded[syndrome] ^= 1;
         }
         return syndrome;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // §8 — Descida do Gradiente (Concept 30 — ML)
-    // ─────────────────────────────────────────────────────────────────────────
-
     public record GradientDescentResult(double[] weights, double finalLoss, int iterations) {}
 
-    /** Simple gradient descent for linear regression: y = w0 + w1*x. */
     public GradientDescentResult gradientDescent(double[] x, double[] y,
                                                    double learningRate, int maxIterations,
                                                    double tolerance) {
@@ -310,11 +245,6 @@ public class MathEngine {
         return new GradientDescentResult(new double[]{w0, w1}, prevLoss, iter);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // §9 — Álgebra Linear (base para ML/IA — Concept 28 & 30)
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /** Matrix multiplication: C = A × B. */
     public double[][] matMul(double[][] a, double[][] b) {
         int rows = a.length, cols = b[0].length, inner = b.length;
         double[][] c = new double[rows][cols];
@@ -325,21 +255,18 @@ public class MathEngine {
         return c;
     }
 
-    /** Dot product of two vectors. */
     public double dotProduct(double[] a, double[] b) {
         double sum = 0;
         for (int i = 0; i < a.length; i++) sum += a[i] * b[i];
         return sum;
     }
 
-    /** L2 norm (Euclidean) of a vector. */
     public double norm(double[] v) {
         double sum = 0;
         for (double d : v) sum += d * d;
         return Math.sqrt(sum);
     }
 
-    /** Cosine similarity between two vectors. */
     public double cosineSimilarity(double[] a, double[] b) {
         return dotProduct(a, b) / (norm(a) * norm(b));
     }
