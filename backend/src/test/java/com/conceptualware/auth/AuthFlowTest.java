@@ -13,10 +13,6 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.*;
 
-/**
- * Concept #21 — Segurança: testes de fluxo de autenticação, JWT, lockout
- * Concept #19 — TDD: cobertura de invariantes de domínio
- */
 @DisplayName("Fluxo de Autenticação — Testes Unitários")
 class AuthFlowTest {
 
@@ -24,12 +20,9 @@ class AuthFlowTest {
 
     @BeforeEach
     void setUp() {
-        // Segredo de 64 caracteres (>= 256 bits para HMAC-SHA-256)
         String secret = "A".repeat(64);
         jwtService = new JwtService(secret, 900_000L, 604_800_000L);
     }
-
-    // ── JwtService ────────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("JwtService — geração e validação de tokens")
@@ -74,10 +67,9 @@ class AuthFlowTest {
         @Test
         @DisplayName("Token expirado é rejeitado por validateToken")
         void expiredTokenRejected() {
-            JwtService shortLived = new JwtService("B".repeat(64), 1L, 1L); // 1 ms de expiração
+            JwtService shortLived = new JwtService("B".repeat(64), 1L, 1L);
             String token = shortLived.generateAccessToken("u1", "a@b.com", Set.of());
 
-            // Aguarda expiração (1ms é suficiente, mas colocamos 10ms para garantia de clock)
             try { Thread.sleep(10); } catch (InterruptedException ignored) {}
 
             assertThat(shortLived.validateToken(token)).isFalse();
@@ -120,8 +112,6 @@ class AuthFlowTest {
         }
     }
 
-    // ── Domínio User — Value Objects ─────────────────────────────────────────
-
     @Nested
     @DisplayName("User.Email — Value Object")
     class EmailValueObjectTests {
@@ -159,8 +149,6 @@ class AuthFlowTest {
         }
 
         @ParameterizedTest
-        // "uuuuu...u" (51 chars) — anotações exigem expressões constantes em tempo de
-        // compilação; "u".repeat(51) não é constante, por isso o literal explícito.
         @ValueSource(strings = { "ab", "a b", "user@name", "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu" })
         @DisplayName("Username inválido lança IllegalArgumentException")
         void invalidUsernameRejected(String username) {
@@ -168,8 +156,6 @@ class AuthFlowTest {
                 .isInstanceOf(IllegalArgumentException.class);
         }
     }
-
-    // ── Domínio User — Lockout ────────────────────────────────────────────────
 
     @Nested
     @DisplayName("User — Proteção contra força bruta")
@@ -179,9 +165,9 @@ class AuthFlowTest {
 
         @BeforeEach
         void setUp() {
-            BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(4); // custo baixo para testes
+            BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(4);
             user = User.create("alice@example.com", "alice", encoder.encode("Password1"));
-            user.verifyEmail(); // ativa a conta
+            user.verifyEmail();
         }
 
         @Test
@@ -214,13 +200,10 @@ class AuthFlowTest {
             user.resetFailedLogins();
 
             assertThat(user.isLockedOut()).isFalse();
-            // Deve aceitar mais 5 tentativas antes de bloquear novamente
             for (int i = 0; i < 4; i++) user.recordFailedLogin();
             assertThat(user.isLockedOut()).isFalse();
         }
     }
-
-    // ── Domínio User — Gestão de Refresh Tokens ──────────────────────────────
 
     @Nested
     @DisplayName("User — Gerenciamento de sessões (refresh tokens)")
@@ -260,7 +243,6 @@ class AuthFlowTest {
             for (int i = 0; i < 6; i++) {
                 user.storeRefreshToken("token-" + i);
             }
-            // token-0 deve ter sido removido (mais antigo)
             assertThat(user.isRefreshTokenValid("token-0")).isFalse();
         }
 
@@ -275,8 +257,6 @@ class AuthFlowTest {
                 .isInstanceOf(UnsupportedOperationException.class);
         }
     }
-
-    // ── Domínio User — Invariantes de Negócio ─────────────────────────────────
 
     @Nested
     @DisplayName("User — Invariantes de negócio")

@@ -9,13 +9,6 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
 
-/**
- * Concept #19 — BDD Step Definitions:
- *   Given-When-Then (Gherkin), ATDD, living documentation
- *   Each method is a step that maps to a Gherkin phrase.
- *
- * Concept #23 — Definition of Done expressed as executable specifications
- */
 public class SortingStepDefinitions {
 
     private int[] input;
@@ -30,14 +23,9 @@ public class SortingStepDefinitions {
     private String editTarget;
     private int editResult;
 
-    // ── Background ────────────────────────────────────────────────────────────
-
     @Given("the sorting engine is initialized")
     public void theSortingEngineIsInitialized() {
-        // SortingAlgorithms is a static utility class — always ready
     }
-
-    // ── Given steps ───────────────────────────────────────────────────────────
 
     @Given("an unsorted array {}")
     public void anUnsortedArray(String arrayLiteral) {
@@ -65,8 +53,6 @@ public class SortingStepDefinitions {
         editSource = source;
         editTarget = target;
     }
-
-    // ── When steps ────────────────────────────────────────────────────────────
 
     @When("I apply {string}")
     public void iApplyAlgorithm(String algorithm) {
@@ -96,8 +82,6 @@ public class SortingStepDefinitions {
     public void iComputeEditDistance() {
         editResult = DynamicProgramming.editDistance(editSource, editTarget);
     }
-
-    // ── Then steps ────────────────────────────────────────────────────────────
 
     @Then("the result should be {}")
     public void theResultShouldBe(String expectedLiteral) {
@@ -129,8 +113,6 @@ public class SortingStepDefinitions {
     public void theResultShouldBeInt(int expected) {
         assertThat(editResult).isEqualTo(expected);
     }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private int[] parseArray(String literal) {
         String clean = literal.replaceAll("[\\[\\]\\s]", "");
