@@ -2,19 +2,13 @@ package com.conceptualware.core.datastructures.tree;
 
 import java.util.*;
 
-/**
- * Concept #4 — Trie (Prefix Tree / Radix Tree)
- *   - Insert, search, startsWith in O(L) where L = word length
- *   - Auto-complete, word frequency, longest common prefix
- * Concept #5 — String searching, prefix matching
- */
 public class Trie {
 
     private static class TrieNode {
         Map<Character, TrieNode> children = new HashMap<>();
         boolean isEndOfWord;
-        int wordCount; // frequency of complete words ending here
-        int prefixCount; // number of words passing through this node
+        int wordCount;
+        int prefixCount;
     }
 
     private final TrieNode root = new TrieNode();
@@ -55,7 +49,6 @@ public class Trie {
         return curr;
     }
 
-    /** Auto-complete: return all words with the given prefix. */
     public List<String> autocomplete(String prefix) {
         List<String> results = new ArrayList<>();
         TrieNode node = findNode(prefix);
@@ -72,7 +65,6 @@ public class Trie {
         }
     }
 
-    /** Delete a word from the trie. */
     public boolean delete(String word) {
         if (!search(word)) return false;
         delete(root, word, 0);
@@ -95,7 +87,6 @@ public class Trie {
         return curr.children.isEmpty() && !curr.isEndOfWord;
     }
 
-    /** Longest common prefix of all words in trie. */
     public String longestCommonPrefix() {
         StringBuilder lcp = new StringBuilder();
         TrieNode curr = root;

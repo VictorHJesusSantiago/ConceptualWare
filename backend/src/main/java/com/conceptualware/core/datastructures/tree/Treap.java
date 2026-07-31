@@ -3,34 +3,13 @@ package com.conceptualware.core.datastructures.tree;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
-/**
- * Concept #4 — Treap (Árvore + Heap):
- *   Randomized BST where each node has:
- *     - A key (BST property: left < key < right)
- *     - A random priority (Max-Heap property: parent.priority > children.priority)
- *
- *   The two properties together produce a unique tree structure that is
- *   equivalent to inserting keys in random priority order into a plain BST.
- *   This gives expected height O(log n) without deterministic rebalancing.
- *
- *   Treap vs Red-Black Tree:
- *     + Simpler to implement (no color invariants, only 2 rotation cases)
- *     + Supports split/merge operations natively
- *     - Slightly slower in practice due to random number generation
- *
- *   Used by: Competitive programming, rope data structures (string with O(log n) split/merge).
- *
- * Concept #5 — Randomized algorithms, expected-case complexity analysis
- */
 public class Treap<K extends Comparable<K>> {
 
     private Node root;
 
-    // ── Node ─────────────────────────────────────────────────────────────────
-
     private class Node {
         K    key;
-        int  priority; // random heap priority
+        int  priority;
         Node left, right;
 
         Node(K key) {
@@ -39,15 +18,10 @@ public class Treap<K extends Comparable<K>> {
         }
     }
 
-    // Node é uma inner class não-estática (carrega K implicitamente) — arrays de Node
-    // (`new Node[]{...}`) são "generic array creation", ilegal em Java. Usamos um par
-    // simples em vez de array para retornar dois nós de splitNode().
     private class NodePair {
         final Node first, second;
         NodePair(Node first, Node second) { this.first = first; this.second = second; }
     }
-
-    // ── Rotations (same as BST rotations, restore heap property) ─────────────
 
     private Node rotateRight(Node y) {
         Node x = y.left;
@@ -63,8 +37,6 @@ public class Treap<K extends Comparable<K>> {
         return y;
     }
 
-    // ── Insertion ─────────────────────────────────────────────────────────────
-
     public void insert(K key) { root = insert(root, key); }
 
     private Node insert(Node node, K key) {
@@ -73,17 +45,13 @@ public class Treap<K extends Comparable<K>> {
         int cmp = key.compareTo(node.key);
         if (cmp < 0) {
             node.left = insert(node.left, key);
-            // Restore heap property if left child has higher priority
             if (node.left.priority > node.priority) node = rotateRight(node);
         } else if (cmp > 0) {
             node.right = insert(node.right, key);
             if (node.right.priority > node.priority) node = rotateLeft(node);
         }
-        // cmp == 0: key exists, no duplicate
         return node;
     }
-
-    // ── Deletion ──────────────────────────────────────────────────────────────
 
     public void delete(K key) { root = delete(root, key); }
 
@@ -96,7 +64,6 @@ public class Treap<K extends Comparable<K>> {
         } else if (cmp > 0) {
             node.right = delete(node.right, key);
         } else {
-            // Found — rotate down until leaf, then remove
             if (node.left == null) return node.right;
             if (node.right == null) return node.left;
 
@@ -111,8 +78,6 @@ public class Treap<K extends Comparable<K>> {
         return node;
     }
 
-    // ── Search ────────────────────────────────────────────────────────────────
-
     public boolean contains(K key) { return findNode(root, key) != null; }
 
     private Node findNode(Node node, K key) {
@@ -122,12 +87,6 @@ public class Treap<K extends Comparable<K>> {
         return cmp < 0 ? findNode(node.left, key) : findNode(node.right, key);
     }
 
-    // ── Split (key structural operation for Treap) ────────────────────────────
-
-    /**
-     * Splits the treap into two treaps: left has all keys < splitKey, right has all keys >= splitKey.
-     * This O(log n) operation is the Treap's main advantage over Red-Black Trees.
-     */
     public Treap<K>[] split(K splitKey) {
         NodePair parts = splitNode(root, splitKey);
         @SuppressWarnings("unchecked")
@@ -150,9 +109,6 @@ public class Treap<K extends Comparable<K>> {
         }
     }
 
-    // ── Merge (inverse of split) ──────────────────────────────────────────────
-
-    /** Merges two treaps. Assumes all keys in left < all keys in right. */
     public static <K extends Comparable<K>> Treap<K> merge(Treap<K> left, Treap<K> right) {
         Treap<K> result = new Treap<>();
         result.root = mergeNodes(left.root, right.root);
@@ -160,11 +116,8 @@ public class Treap<K extends Comparable<K>> {
     }
 
     private static <K extends Comparable<K>> Treap.Node mergeNodes(Object l, Object r) {
-        // Using raw node merge — avoids unchecked generic cast issues
-        return null; // implemented below with typed version
+        return null;
     }
-
-    // ── Traversal ─────────────────────────────────────────────────────────────
 
     public List<K> inOrder() {
         List<K> result = new ArrayList<>();
@@ -179,12 +132,11 @@ public class Treap<K extends Comparable<K>> {
         inOrder(node.right, result);
     }
 
-    /** Verifies max-heap priority property at every node. */
     public boolean isValidTreap() { return isValid(root, Integer.MIN_VALUE, Integer.MAX_VALUE); }
 
     private boolean isValid(Node node, int minPriority, int parentPriority) {
         if (node == null) return true;
-        if (node.priority > parentPriority) return false; // heap violation
+        if (node.priority > parentPriority) return false;
         return isValid(node.left, minPriority, node.priority)
             && isValid(node.right, minPriority, node.priority);
     }
