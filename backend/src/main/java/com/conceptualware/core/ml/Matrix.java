@@ -3,13 +3,6 @@ package com.conceptualware.core.ml;
 import java.util.Arrays;
 import java.util.Random;
 
-/**
- * Dense matrix implementation used by all ML algorithms.
- * Row-major storage: element [i][j] = data[i * cols + j].
- *
- * Covers: dot product, transpose, element-wise ops, Gaussian elimination,
- * eigenvalue iteration (power method), singular values (Jacobi SVD sketch).
- */
 public class Matrix {
 
     public final int rows;
@@ -30,15 +23,11 @@ public class Matrix {
             System.arraycopy(values[i], 0, data, i * cols, cols);
     }
 
-    // ── Element access ────────────────────────────────────────────────────────
-
     public double get(int r, int c)       { return data[r * cols + c]; }
     public void   set(int r, int c, double v) { data[r * cols + c] = v; }
 
     public double[] row(int r)    { return Arrays.copyOfRange(data, r * cols, r * cols + cols); }
     public double[] col(int c)    { double[] out = new double[rows]; for (int i=0;i<rows;i++) out[i]=data[i*cols+c]; return out; }
-
-    // ── Factory Methods ───────────────────────────────────────────────────────
 
     public static Matrix zeros(int r, int c)  { return new Matrix(r, c); }
 
@@ -80,23 +69,19 @@ public class Matrix {
         return m;
     }
 
-    // ── Arithmetic ────────────────────────────────────────────────────────────
-
-    /** Matrix multiplication: this (m×k) × other (k×n) → (m×n). O(m·k·n). */
     public Matrix mul(Matrix other) {
         if (cols != other.rows) throw new IllegalArgumentException("Dimension mismatch: " + cols + " ≠ " + other.rows);
         Matrix result = new Matrix(rows, other.cols);
         for (int i = 0; i < rows; i++)
             for (int k = 0; k < cols; k++) {
                 double a = get(i, k);
-                if (a == 0) continue; // sparsity hint
+                if (a == 0) continue;
                 for (int j = 0; j < other.cols; j++)
                     result.data[i * other.cols + j] += a * other.get(k, j);
             }
         return result;
     }
 
-    /** Element-wise multiplication (Hadamard product). */
     public Matrix hadamard(Matrix other) {
         checkSameShape(other);
         Matrix result = new Matrix(rows, cols);
@@ -137,14 +122,11 @@ public class Matrix {
         return result;
     }
 
-    /** Apply a function element-wise. */
     public Matrix map(java.util.function.DoubleUnaryOperator fn) {
         Matrix result = new Matrix(rows, cols);
         for (int i = 0; i < data.length; i++) result.data[i] = fn.applyAsDouble(data[i]);
         return result;
     }
-
-    // ── Dot products & norms ──────────────────────────────────────────────────
 
     public static double dot(double[] a, double[] b) {
         double sum = 0;
@@ -166,7 +148,6 @@ public class Matrix {
         return out;
     }
 
-    /** Sum of all elements. */
     public double sum() {
         double s = 0;
         for (double d : data) s += d;
@@ -197,7 +178,6 @@ public class Matrix {
         return stds;
     }
 
-    /** Standardize columns to zero-mean unit-variance. */
     public Matrix standardize() {
         double[] means = colMeans();
         double[] stds  = colStds(means);
@@ -208,18 +188,14 @@ public class Matrix {
         return result;
     }
 
-    // ── Column appending for augmented matrices ────────────────────────────────
-
     public Matrix addBiasColumn() {
         Matrix result = new Matrix(rows, cols + 1);
         for (int i = 0; i < rows; i++) {
-            result.set(i, 0, 1.0); // bias = 1
+            result.set(i, 0, 1.0);
             for (int j = 0; j < cols; j++) result.set(i, j + 1, get(i, j));
         }
         return result;
     }
-
-    // ── Power method: dominant eigenvalue/eigenvector ─────────────────────────
 
     public double[] dominantEigenvector(int maxIter) {
         Random rng = new Random(42);
@@ -240,8 +216,6 @@ public class Matrix {
         return dot(eigenvector, mv);
     }
 
-    // ── Slicing ───────────────────────────────────────────────────────────────
-
     public Matrix rowSlice(int from, int to) {
         Matrix result = new Matrix(to - from, cols);
         for (int i = from; i < to; i++)
@@ -250,8 +224,6 @@ public class Matrix {
     }
 
     public double[] getRow(int i) { return Arrays.copyOfRange(data, i * cols, (i + 1) * cols); }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private void checkSameShape(Matrix other) {
         if (rows != other.rows || cols != other.cols)
