@@ -11,11 +11,6 @@ import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Concept #25 — REST: HATEOAS-ready resource design, path variables, query params
- * Concept #21 — Security: @PreAuthorize, authenticated endpoints
- * Concept #12 — Architecture: Controller in Ports layer (Hexagonal)
- */
 @RestController
 @RequestMapping("/api/v1/users")
 public class UserController {
@@ -28,7 +23,6 @@ public class UserController {
         this.metricsService = metricsService;
     }
 
-    /** GET /api/v1/users/me — current user profile */
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
     @Timed("api.users.me")
@@ -49,7 +43,6 @@ public class UserController {
             .orElse(ResponseEntity.notFound().build());
     }
 
-    /** GET /api/v1/users/leaderboard — top users by points */
     @GetMapping("/leaderboard")
     @Timed("api.users.leaderboard")
     public ResponseEntity<?> getLeaderboard(@RequestParam(defaultValue = "10") int limit) {
@@ -58,7 +51,6 @@ public class UserController {
         return ResponseEntity.ok(Map.of("items", leaderboard, "limit", safeLimit));
     }
 
-    /** GET /api/v1/users/progress — concept progress breakdown */
     @GetMapping("/progress")
     @PreAuthorize("isAuthenticated()")
     @Timed("api.users.progress")
@@ -82,7 +74,6 @@ public class UserController {
             .orElse(ResponseEntity.notFound().build());
     }
 
-    /** GET /api/v1/users/stats — aggregated skill level distribution (admin view) */
     @GetMapping("/stats")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> getStats() {

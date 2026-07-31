@@ -13,10 +13,6 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Concept #21 — Segurança: CSRF token issuance, CSP violation reporting,
- *   dashboard de auditoria (agregação de eventos sensíveis).
- */
 @RestController
 @RequestMapping("/api/v1/security")
 @RequiredArgsConstructor
@@ -26,23 +22,14 @@ public class SecurityController {
     private final CsrfTokenService csrfTokenService;
     private final SecurityAuditService auditService;
 
-    // ── GET /api/v1/security/csrf-token ───────────────────────────────────────
-
     @GetMapping("/csrf-token")
     public ResponseEntity<Map<String, String>> issueCsrfToken() {
         String token = csrfTokenService.generateToken();
         return ResponseEntity.ok()
-            // Não HttpOnly de propósito: o cliente precisa ler para reenviar no header (double-submit).
             .header("Set-Cookie", "csrf-token=" + token + "; Path=/; SameSite=Strict; Secure")
             .body(Map.of("csrfToken", token));
     }
 
-    // ── POST /api/v1/security/csp-report ──────────────────────────────────────
-
-    /**
-     * Endpoint compatível com o formato "report-to"/"report-uri" do Content-Security-Policy.
-     * Configure no header CSP: Content-Security-Policy-Report-Only: ...; report-uri /api/v1/security/csp-report
-     */
     @PostMapping("/csp-report")
     public ResponseEntity<Void> cspReport(@RequestBody(required = false) Map<String, Object> report,
                                            HttpServletRequest request) {
@@ -51,8 +38,6 @@ public class SecurityController {
         auditService.record(SecurityAuditService.EventType.CSP_VIOLATION, request.getRemoteAddr(), detail);
         return ResponseEntity.noContent().build();
     }
-
-    // ── GET /api/v1/security/audit ────────────────────────────────────────────
 
     @GetMapping("/audit")
     @PreAuthorize("hasRole('ADMIN')")
