@@ -4,14 +4,8 @@ import com.conceptualware.core.algorithms.dp.DynamicProgramming;
 import org.junit.jupiter.api.*;
 import static org.assertj.core.api.Assertions.*;
 
-/**
- * Concept #19 — Testes: TDD, AAA, Property-based testing patterns
- * Concept #5  — DP: Fibonacci, Knapsack, LCS, Edit Distance, Coin Change, N-Queens
- */
 @DisplayName("Dynamic Programming — Unit Tests")
 class DynamicProgrammingTest {
-
-    // ── Fibonacci ──────────────────────────────────────────────────────────────
 
     @Test @DisplayName("fib(0) = 0") void fib0() { assertThat(DynamicProgramming.fibTabulation(0)).isEqualTo(0); }
     @Test @DisplayName("fib(1) = 1") void fib1() { assertThat(DynamicProgramming.fibTabulation(1)).isEqualTo(1); }
@@ -19,8 +13,6 @@ class DynamicProgrammingTest {
     @Test @DisplayName("fib(50) = 12586269025") void fib50() {
         assertThat(DynamicProgramming.fibTabulation(50)).isEqualTo(12_586_269_025L);
     }
-
-    // ── Knapsack ───────────────────────────────────────────────────────────────
 
     @Test
     @DisplayName("Knapsack — classic example")
@@ -35,8 +27,6 @@ class DynamicProgrammingTest {
     void knapsackEmpty() {
         assertThat(DynamicProgramming.knapsack01(new int[]{}, new int[]{}, 10)).isEqualTo(0);
     }
-
-    // ── LCS ───────────────────────────────────────────────────────────────────
 
     @Test
     @DisplayName("LCS of 'ABCBDAB' and 'BDCAB' is 4")
@@ -57,8 +47,6 @@ class DynamicProgrammingTest {
         assertThat(DynamicProgramming.lcs("", "ABC")).isEqualTo(0);
     }
 
-    // ── Edit Distance ──────────────────────────────────────────────────────────
-
     @Test
     @DisplayName("Edit distance between same strings is 0")
     void editDistanceSame() {
@@ -78,8 +66,6 @@ class DynamicProgrammingTest {
         assertThat(DynamicProgramming.editDistance("abc", "")).isEqualTo(3);
     }
 
-    // ── Coin Change ────────────────────────────────────────────────────────────
-
     @Test
     @DisplayName("Coin change [1,5,10,25] for 30 = 2 coins (25+5)")
     void coinChange30() {
@@ -98,8 +84,6 @@ class DynamicProgrammingTest {
         assertThat(DynamicProgramming.coinChange(new int[]{1, 5}, 0)).isEqualTo(0);
     }
 
-    // ── N-Queens ──────────────────────────────────────────────────────────────
-
     @Test
     @DisplayName("4-Queens has 2 solutions")
     void nQueens4() {
@@ -112,15 +96,11 @@ class DynamicProgrammingTest {
         assertThat(DynamicProgramming.solveNQueens(8)).hasSize(92);
     }
 
-    // ── LIS ───────────────────────────────────────────────────────────────────
-
     @Test
     @DisplayName("LIS of [10,9,2,5,3,7,101,18] is 4")
     void lisTest() {
         assertThat(DynamicProgramming.lis(new int[]{10,9,2,5,3,7,101,18})).isEqualTo(4);
     }
-
-    // ── Monte Carlo Pi ────────────────────────────────────────────────────────
 
     @Test
     @DisplayName("Monte Carlo Pi estimate should be within 0.1 of actual π")

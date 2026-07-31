@@ -6,15 +6,8 @@ import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.assertj.core.data.Offset.offset;
 
-/**
- * Concept #5  — Algorithms: Search, IntroSort, Branch & Bound,
- *               Compression, Cryptography, Consensus, Amortized Analysis
- * Concept #19 — TDD: AAA, property-based invariants
- */
 @DisplayName("Category 5 — Algorithms: Complete Test Suite")
 class AlgorithmsTest {
-
-    // ── Search Algorithms ─────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("Search Algorithms")
@@ -87,7 +80,6 @@ class AlgorithmsTest {
         void bidirectionalBFS() {
             Map<Integer, List<Integer>> graph = new HashMap<>();
             for (int i = 0; i < 6; i++) graph.put(i, new ArrayList<>());
-            // Linear chain: 0-1-2-3-4-5
             int[][] edges = {{0,1},{1,2},{2,3},{3,4},{4,5}};
             for (int[] e : edges) {
                 graph.get(e[0]).add(e[1]);
@@ -100,7 +92,6 @@ class AlgorithmsTest {
         @Test
         @DisplayName("A* finds optimal path with admissible heuristic")
         void aStarPathfinding() {
-            // Simple grid: nodes 0-4 in a line with weight 1
             Map<Integer, List<int[]>> graph = new HashMap<>();
             for (int i = 0; i < 4; i++) {
                 graph.put(i, new ArrayList<>());
@@ -108,14 +99,11 @@ class AlgorithmsTest {
             }
             graph.put(4, List.of());
 
-            // h(n) = distance to goal (admissible)
             Optional<List<Integer>> path = SearchAlgorithms.aStar(graph, 0, 4, n -> 4 - n);
             assertThat(path).isPresent();
             assertThat(path.get()).containsExactly(0, 1, 2, 3, 4);
         }
     }
-
-    // ── IntroSort ────────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("IntroSort (Hybrid QuickSort + HeapSort + InsertionSort)")
@@ -179,8 +167,6 @@ class AlgorithmsTest {
         }
     }
 
-    // ── Branch and Bound ──────────────────────────────────────────────────────
-
     @Nested
     @DisplayName("Branch and Bound")
     class BranchAndBoundTests {
@@ -191,12 +177,7 @@ class AlgorithmsTest {
             int[] weights = {2, 3, 4, 5};
             int[] values  = {3, 4, 5, 6};
             int result = BranchAndBound.knapsack(weights, values, 8);
-            assertThat(result).isEqualTo(10); // items 0+1+3: 3+4+... or items 0+1+2: 3+4+5=12? check
-            // With capacity 8: best is items 0(w2,v3)+1(w3,v4)+3(w5,v6) = w10 > cap
-            // items 0+1: w5,v7 | items 0+2: w6,v8 | items 0+1+no: w5,v7
-            // items 0+3: w7,v9 | items 1+2: w7,v9 | items 0+1+? 5+3=8 ok: v7+item2? no 5+4>8
-            // Actually: 0+3: w2+5=7,v3+6=9 | 1+2: w3+4=7,v4+5=9 | items 0+1+2: w9>8
-            // items 2+0: w6,v8 items 0+1: w5,v7 ... max should be 10 (items 1+3: w8,v10)
+            assertThat(result).isEqualTo(10);
             assertThat(result).isEqualTo(10);
         }
 
@@ -216,7 +197,6 @@ class AlgorithmsTest {
                 {10, 0, 20},
                 {15, 20, 0}
             };
-            // Only one tour: 0→1→2→0 = 10+20+15 = 45
             assertThat(BranchAndBound.tspBranchAndBound(dist)).isEqualTo(45);
         }
 
@@ -235,8 +215,6 @@ class AlgorithmsTest {
         }
     }
 
-    // ── Compression Algorithms ────────────────────────────────────────────────
-
     @Nested
     @DisplayName("Compression Algorithms")
     class CompressionTests {
@@ -253,7 +231,7 @@ class AlgorithmsTest {
         @Test
         @DisplayName("LZ77 compresses repetitive text (fewer tokens than chars)")
         void lz77CompressesRepetitive() {
-            String input = "aaaaaaaaaa"; // 10 'a's
+            String input = "aaaaaaaaaa";
             var tokens = CompressionAlgorithms.lz77Compress(input, 8, 8);
             assertThat(tokens.size()).isLessThan(input.length());
         }
@@ -295,7 +273,7 @@ class AlgorithmsTest {
         @Test
         @DisplayName("Huffman codes — most frequent char gets shortest code")
         void huffmanFrequencyProperty() {
-            String input = "aaaaabbbcc"; // a=5, b=3, c=2
+            String input = "aaaaabbbcc";
             Map<Character, String> codes = CompressionAlgorithms.buildHuffmanCodes(input);
             assertThat(codes.get('a').length()).isLessThanOrEqualTo(codes.get('b').length());
             assertThat(codes.get('b').length()).isLessThanOrEqualTo(codes.get('c').length());
@@ -317,8 +295,6 @@ class AlgorithmsTest {
             assertThat(CompressionAlgorithms.rleEncode("abc")).isEqualTo("abc");
         }
     }
-
-    // ── Cryptographic Algorithms ──────────────────────────────────────────────
 
     @Nested
     @DisplayName("Cryptographic Algorithms")
@@ -342,7 +318,7 @@ class AlgorithmsTest {
         @DisplayName("SHA-256 avalanche effect: 1-bit change alters ~50% output bits")
         void sha256Avalanche() throws Exception {
             var result = CryptographicAlgorithms.demonstrateAvalanche("hello");
-            assertThat(result.bitsChanged()).isBetween(80, 180); // roughly 50% of 256 bits
+            assertThat(result.bitsChanged()).isBetween(80, 180);
         }
 
         @Test
@@ -362,7 +338,7 @@ class AlgorithmsTest {
             var pt  = "same plaintext".getBytes();
             var c1  = CryptographicAlgorithms.aesGcmEncrypt(pt, key);
             var c2  = CryptographicAlgorithms.aesGcmEncrypt(pt, key);
-            assertThat(c1).isNotEqualTo(c2); // different random IVs
+            assertThat(c1).isNotEqualTo(c2);
         }
 
         @Test
@@ -382,7 +358,6 @@ class AlgorithmsTest {
             var data = "important message".getBytes();
             var sig  = CryptographicAlgorithms.rsaSign(data, kp.getPrivate());
             assertThat(CryptographicAlgorithms.rsaVerify(data, sig, kp.getPublic())).isTrue();
-            // Tamper with data
             data[0] ^= 1;
             assertThat(CryptographicAlgorithms.rsaVerify(data, sig, kp.getPublic())).isFalse();
         }
@@ -414,8 +389,6 @@ class AlgorithmsTest {
         }
     }
 
-    // ── Consensus Algorithms ──────────────────────────────────────────────────
-
     @Nested
     @DisplayName("Consensus Algorithms — Raft and Paxos")
     class ConsensusTests {
@@ -443,7 +416,6 @@ class AlgorithmsTest {
         @DisplayName("Raft — non-leader cannot replicate commands")
         void raftNonLeaderRejects() {
             List<ConsensusAlgorithms.RaftNode> cluster = ConsensusAlgorithms.createRaftCluster(3);
-            // node(1) is FOLLOWER — should reject replicate
             assertThat(cluster.get(1).replicateCommand("SET y=2")).isFalse();
         }
 
@@ -464,7 +436,7 @@ class AlgorithmsTest {
             cluster.runConsensus("agreed-value", 0);
             List<Optional<String>> accepted = cluster.getAcceptedValues();
             long agreeing = accepted.stream().filter(v -> v.filter("agreed-value"::equals).isPresent()).count();
-            assertThat(agreeing).isGreaterThanOrEqualTo(3); // majority
+            assertThat(agreeing).isGreaterThanOrEqualTo(3);
         }
 
         @Test
