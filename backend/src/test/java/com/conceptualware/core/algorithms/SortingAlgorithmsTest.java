@@ -10,19 +10,8 @@ import java.util.Random;
 
 import static org.assertj.core.api.Assertions.*;
 
-/**
- * Concept #19 — Testes de Software:
- *   Teste unitário, TDD (Red-Green-Refactor), AAA (Arrange-Act-Assert),
- *   Cobertura por linhas, ramificações, condições
- *   Teste de mutação (mutation testing verified via AAA)
- *   Property-based testing concepts, Test isolation
- *
- * Follows: Given-When-Then (same as Arrange-Act-Assert)
- */
 @DisplayName("Sorting Algorithms — Unit Tests")
 class SortingAlgorithmsTest {
-
-    // ── Helpers ────────────────────────────────────────────────────────────────
 
     private static int[] randomArray(int size, long seed) {
         Random rng = new Random(seed);
@@ -35,8 +24,6 @@ class SortingAlgorithmsTest {
         return copy;
     }
 
-    // ── Bubble Sort ────────────────────────────────────────────────────────────
-
     @Nested
     @DisplayName("Bubble Sort")
     class BubbleSortTests {
@@ -44,13 +31,10 @@ class SortingAlgorithmsTest {
         @Test
         @DisplayName("Should sort random array correctly")
         void shouldSortRandomArray() {
-            // Arrange
             int[] input = {64, 34, 25, 12, 22, 11, 90};
 
-            // Act
             int[] result = SortingAlgorithms.bubbleSort(input);
 
-            // Assert
             assertThat(result).isSorted();
             assertThat(result).containsExactlyInAnyOrder(64, 34, 25, 12, 22, 11, 90);
         }
@@ -91,8 +75,6 @@ class SortingAlgorithmsTest {
         }
     }
 
-    // ── Merge Sort ─────────────────────────────────────────────────────────────
-
     @Nested
     @DisplayName("Merge Sort")
     class MergeSortTests {
@@ -116,17 +98,13 @@ class SortingAlgorithmsTest {
         @Test
         @DisplayName("Should be stable (equal elements preserve relative order)")
         void shouldBeStable() {
-            // Merge sort is stable — equal elements keep original order
             int[] input = {5, 3, 5, 1, 5};
             int[] result = SortingAlgorithms.mergeSort(input);
             assertThat(result).isSorted();
-            // Count occurrences preserved
             long fives = Arrays.stream(result).filter(x -> x == 5).count();
             assertThat(fives).isEqualTo(3);
         }
     }
-
-    // ── Quick Sort ─────────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("Quick Sort")
@@ -148,8 +126,6 @@ class SortingAlgorithmsTest {
         }
     }
 
-    // ── Counting Sort ──────────────────────────────────────────────────────────
-
     @Test
     @DisplayName("Counting Sort — should sort non-negative integers")
     void countingSortShouldWork() {
@@ -157,16 +133,12 @@ class SortingAlgorithmsTest {
         assertThat(SortingAlgorithms.countingSort(input, 8)).isSorted();
     }
 
-    // ── Radix Sort ─────────────────────────────────────────────────────────────
-
     @Test
     @DisplayName("Radix Sort — should sort correctly")
     void radixSortShouldWork() {
         int[] input = {170, 45, 75, 90, 802, 24, 2, 66};
         assertThat(SortingAlgorithms.radixSort(input)).isSorted();
     }
-
-    // ── Comparative correctness (property-based style) ────────────────────────
 
     @RepeatedTest(5)
     @DisplayName("All algorithms produce identical sorted output")
@@ -183,8 +155,6 @@ class SortingAlgorithmsTest {
         assertThat(SortingAlgorithms.shellSort(input))     .isEqualTo(expected);
         assertThat(SortingAlgorithms.timSort(input))       .isEqualTo(expected);
     }
-
-    // ── Performance benchmark (smoke test — Concept #19) ─────────────────────
 
     @Test
     @DisplayName("Merge Sort should sort 10K elements in under 1s")
