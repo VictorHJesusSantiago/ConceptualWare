@@ -7,11 +7,6 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.*;
 
-/**
- * Concept #7  — OOP: Composição, Associação, Enum, Classe interna
- * Concept #12 — DDD: Entidade, Objeto de Valor (TestCase, Submission)
- * Concept #19 — Testes: Casos de teste, critérios de aceitação (Given-When-Then)
- */
 @Document(collection = "challenges")
 @Getter
 @NoArgsConstructor
@@ -21,11 +16,10 @@ public class Challenge extends AggregateRoot {
     public enum ChallengeType { ALGORITHM, DATA_STRUCTURE, DEBUGGING, DESIGN }
     public enum Language { JAVA, TYPESCRIPT, JAVASCRIPT, PYTHON, GO }
 
-    // Test case — Given-When-Then structure (Concept #19)
     public record TestCase(
-        String description,   // Given
-        String input,         // When
-        String expectedOutput, // Then
+        String description,
+        String input,
+        String expectedOutput,
         boolean isPublic,
         int points
     ) {}
@@ -41,8 +35,6 @@ public class Challenge extends AggregateRoot {
         long memoryUsedBytes,
         java.time.Instant submittedAt
     ) {}
-
-    // ── Fields ────────────────────────────────────────────────────────────────
 
     private String title;
     private String description;
@@ -61,14 +53,12 @@ public class Challenge extends AggregateRoot {
     private int maxInputSize = 10_000;
 
     private String starterCode;
-    private String solutionCode; // Hidden from users
-    private String algorithmSlug; // Related algorithm
+    private String solutionCode;
+    private String algorithmSlug;
 
     private double successRate = 0;
     private int totalAttempts = 0;
     private int successfulAttempts = 0;
-
-    // ── Factory ───────────────────────────────────────────────────────────────
 
     public static Challenge create(String title, String description, String problemStatement,
                                     Difficulty difficulty, ChallengeType type, int points) {
@@ -82,8 +72,6 @@ public class Challenge extends AggregateRoot {
         c.points = points;
         return c;
     }
-
-    // ── Business Methods ──────────────────────────────────────────────────────
 
     public void addTestCase(String desc, String input, String expected, boolean pub, int pts) {
         testCases.add(new TestCase(desc, input, expected, pub, pts));

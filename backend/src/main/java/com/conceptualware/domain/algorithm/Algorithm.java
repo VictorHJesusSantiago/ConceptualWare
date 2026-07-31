@@ -10,20 +10,10 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.util.*;
 import java.util.Collections;
 
-/**
- * Algorithm aggregate — central domain entity for the platform.
- *
- * Concept #7  — OOP: Enum, Record, Inner class, Nested class, Association
- * Concept #11 — MongoDB: full-text index, compound index, embedded documents
- * Concept #12 — DDD: Entity, Value Object (Complexity, Implementation), Repository Pattern
- * Concept #6  — Paradigmas: OOP + Functional (steps as immutable list)
- */
 @Document(collection = "algorithms")
 @Getter
 @NoArgsConstructor
 public class Algorithm extends AggregateRoot {
-
-    // ── Enumerations ──────────────────────────────────────────────────────────
 
     public enum Category {
         SORTING, SEARCHING, GRAPH, DYNAMIC_PROGRAMMING, STRING,
@@ -33,8 +23,6 @@ public class Algorithm extends AggregateRoot {
 
     public enum Difficulty { EASY, MEDIUM, HARD, EXPERT }
 
-    // ── Value Objects ─────────────────────────────────────────────────────────
-
     public record Complexity(String time, String space, String description) {}
 
     public record Implementation(String language, String code, boolean isVerified) {}
@@ -42,10 +30,8 @@ public class Algorithm extends AggregateRoot {
     public record ExecutionStep(int stepNumber, String description, int[] arrayState,
                                  Map<String, Object> variables) {}
 
-    // ── Fields ────────────────────────────────────────────────────────────────
-
     @Indexed(unique = true)
-    private String slug; // URL-friendly identifier
+    private String slug;
 
     @TextIndexed(weight = 10)
     private String name;
@@ -61,7 +47,7 @@ public class Algorithm extends AggregateRoot {
 
     private final List<String> tags = new ArrayList<>();
     private final List<Implementation> implementations = new ArrayList<>();
-    private final List<String> prerequisites = new ArrayList<>(); // Other algorithm slugs
+    private final List<String> prerequisites = new ArrayList<>();
     private final List<String> applications = new ArrayList<>();
 
     private int viewCount = 0;
@@ -72,8 +58,6 @@ public class Algorithm extends AggregateRoot {
     private boolean isStable;
     private boolean isInPlace;
     private boolean isRecursive;
-
-    // ── Factory ───────────────────────────────────────────────────────────────
 
     public static Algorithm create(String slug, String name, String description,
                                     Category category, Difficulty difficulty,
@@ -88,8 +72,6 @@ public class Algorithm extends AggregateRoot {
         algo.spaceComplexity = Objects.requireNonNull(spaceComplexity);
         return algo;
     }
-
-    // ── Business Methods ──────────────────────────────────────────────────────
 
     public void addImplementation(String language, String code) {
         implementations.add(new Implementation(language, code, false));
@@ -112,19 +94,13 @@ public class Algorithm extends AggregateRoot {
 
     public boolean isPopular() { return viewCount > 1000 || likeCount > 100; }
 
-    // ── Getters seguros para coleções mutáveis ────────────────────────────────
-
-    /** Implementações — lista imutável para o chamador. */
     public List<Implementation> getImplementations() {
         return Collections.unmodifiableList(implementations);
     }
 
-    /** Tags — lista imutável. */
     public List<String> getTags() { return Collections.unmodifiableList(tags); }
 
-    /** Pré-requisitos — lista imutável. */
     public List<String> getPrerequisites() { return Collections.unmodifiableList(prerequisites); }
 
-    /** Aplicações — lista imutável. */
     public List<String> getApplications() { return Collections.unmodifiableList(applications); }
 }
