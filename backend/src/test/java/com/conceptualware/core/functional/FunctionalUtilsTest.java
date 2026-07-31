@@ -6,14 +6,8 @@ import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.*;
 
-/**
- * Concept #8  — Programação Funcional: all concepts tested
- * Concept #19 — TDD: AAA pattern, property-based invariants
- */
 @DisplayName("Functional Programming — Complete Test Suite")
 class FunctionalUtilsTest {
-
-    // ── Currying ──────────────────────────────────────────────────────────────
 
     @Test
     @DisplayName("Curried add: curry(add)(2)(3) == 5")
@@ -29,15 +23,13 @@ class FunctionalUtilsTest {
         assertThat(times3.apply(4)).isEqualTo(12);
     }
 
-    // ── Function composition ──────────────────────────────────────────────────
-
     @Test
     @DisplayName("compose: (f ∘ g)(x) = f(g(x))")
     void functionCompose() {
         Function<Integer, Integer> doubleIt = x -> x * 2;
         Function<Integer, Integer> addOne   = x -> x + 1;
-        var doubleThenAddOne = FunctionalUtils.compose(addOne, doubleIt); // addOne(doubleIt(x))
-        assertThat(doubleThenAddOne.apply(5)).isEqualTo(11); // (5*2)+1 = 11
+        var doubleThenAddOne = FunctionalUtils.compose(addOne, doubleIt);
+        assertThat(doubleThenAddOne.apply(5)).isEqualTo(11);
     }
 
     @Test
@@ -49,10 +41,8 @@ class FunctionalUtilsTest {
             x -> x * 2,
             x -> x - 3
         );
-        assertThat(pipeline.apply(5)).isEqualTo(9); // ((5+1)*2)-3 = 9
+        assertThat(pipeline.apply(5)).isEqualTo(9);
     }
-
-    // ── Memoization ───────────────────────────────────────────────────────────
 
     @Test
     @DisplayName("Memoized function returns same result and only computes once")
@@ -62,11 +52,9 @@ class FunctionalUtilsTest {
         var memoized = FunctionalUtils.memoize(expensive);
 
         assertThat(memoized.apply(5)).isEqualTo(25);
-        assertThat(memoized.apply(5)).isEqualTo(25); // from cache
-        assertThat(callCount[0]).isEqualTo(1);       // only computed once
+        assertThat(memoized.apply(5)).isEqualTo(25);
+        assertThat(callCount[0]).isEqualTo(1);
     }
-
-    // ── Result monad (Either) ─────────────────────────────────────────────────
 
     @Test
     @DisplayName("Result.Ok — map transforms value")
@@ -92,8 +80,6 @@ class FunctionalUtilsTest {
         assertThat(result.getOrElse(0)).isEqualTo(20);
     }
 
-    // ── Maybe monad ───────────────────────────────────────────────────────────
-
     @Test
     @DisplayName("Maybe.of(null) returns Nothing")
     void maybeOfNull() {
@@ -106,8 +92,6 @@ class FunctionalUtilsTest {
         var just = FunctionalUtils.Maybe.of(5);
         assertThat(just.map(x -> x * 3).getOrElse(0)).isEqualTo(15);
     }
-
-    // ── Applicative Functor ───────────────────────────────────────────────────
 
     @Test
     @DisplayName("Applicative.pure lifts a value")
@@ -148,16 +132,14 @@ class FunctionalUtilsTest {
         assertThat(empty.ap(wrappedFn)).isInstanceOf(FunctionalUtils.Applicative.Empty.class);
     }
 
-    // ── IO Monad ──────────────────────────────────────────────────────────────
-
     @Test
     @DisplayName("IO.of — deferred value, executes on unsafeRun")
     void ioMonadDeferred() {
         int[] sideEffect = {0};
         FunctionalUtils.IO<Integer> io = FunctionalUtils.IO.effect(() -> { sideEffect[0]++; return 42; });
-        assertThat(sideEffect[0]).isEqualTo(0);   // not yet run
+        assertThat(sideEffect[0]).isEqualTo(0);
         assertThat(io.unsafeRun()).isEqualTo(42);
-        assertThat(sideEffect[0]).isEqualTo(1);   // ran exactly once
+        assertThat(sideEffect[0]).isEqualTo(1);
     }
 
     @Test
@@ -167,16 +149,12 @@ class FunctionalUtilsTest {
         assertThat(io.unsafeRun()).isEqualTo(10);
     }
 
-    // ── Trampolining ──────────────────────────────────────────────────────────
-
     @Test
     @DisplayName("Trampolined factorial — no stack overflow for large n")
     void trampolinedFactorial() {
         long result = FunctionalUtils.factorialTrampoline(10, 1).run();
         assertThat(result).isEqualTo(3_628_800L);
     }
-
-    // ── Monoid ────────────────────────────────────────────────────────────────
 
     @Test
     @DisplayName("Sum monoid fold: [1,2,3,4,5] = 15")
@@ -191,8 +169,6 @@ class FunctionalUtilsTest {
             .isEqualTo("ConceptualWare");
     }
 
-    // ── Lazy evaluation ───────────────────────────────────────────────────────
-
     @Test
     @DisplayName("Lazy — supplier only called once")
     void lazyEvaluation() {
@@ -201,6 +177,6 @@ class FunctionalUtilsTest {
         assertThat(callCount[0]).isEqualTo(0);
         assertThat(lazy.get()).isEqualTo(99);
         assertThat(lazy.get()).isEqualTo(99);
-        assertThat(callCount[0]).isEqualTo(1); // computed only once
+        assertThat(callCount[0]).isEqualTo(1);
     }
 }

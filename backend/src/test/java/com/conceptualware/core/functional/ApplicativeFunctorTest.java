@@ -11,8 +11,6 @@ import static org.junit.jupiter.api.Assertions.*;
 @DisplayName("Applicative Functor")
 class ApplicativeFunctorTest {
 
-    // ── Maybe Functor ──────────────────────────────────────────────────────────
-
     @Test
     @DisplayName("Maybe.map: Just transforms value")
     void testMaybeMapJust() {
@@ -27,8 +25,6 @@ class ApplicativeFunctorTest {
         ApplicativeFunctor.Maybe<Integer> nothing = ApplicativeFunctor.Maybe.nothing();
         assertFalse(nothing.map(x -> x * 2).isPresent());
     }
-
-    // ── Maybe Applicative ─────────────────────────────────────────────────────
 
     @Test
     @DisplayName("Maybe.ap: Just(f) applied to Just(x) = Just(f(x))")
@@ -79,8 +75,6 @@ class ApplicativeFunctorTest {
         assertFalse(result.isPresent());
     }
 
-    // ── Validation — error accumulation ───────────────────────────────────────
-
     @Test
     @DisplayName("Validation: all valid fields produce Valid result")
     void testValidationAllValid() {
@@ -101,7 +95,6 @@ class ApplicativeFunctorTest {
     @Test
     @DisplayName("Validation: ALL three invalid fields accumulate ALL three errors")
     void testValidationAllFieldsInvalid() {
-        // blank username + bad email + underage
         var result = ApplicativeFunctor.validateUser("", "not-an-email", 5);
         assertTrue(result.isInvalid());
         var errors = ((ApplicativeFunctor.Validation.Invalid<String, ApplicativeFunctor.UserForm>) result).errors();
@@ -125,8 +118,6 @@ class ApplicativeFunctorTest {
         assertTrue(errors.contains("error-from-value-side"));
     }
 
-    // ── List Applicative (cartesian product) ──────────────────────────────────
-
     @Test
     @DisplayName("listAp: cartesian product of functions × values")
     void testListAp() {
@@ -136,7 +127,6 @@ class ApplicativeFunctorTest {
         );
         List<Integer> xs = List.of(1, 2, 3);
         var result = ApplicativeFunctor.listAp(fns, xs);
-        // [f1(1), f1(2), f1(3), f2(1), f2(2), f2(3)]
         assertEquals(List.of(11, 12, 13, 2, 4, 6), result);
     }
 
