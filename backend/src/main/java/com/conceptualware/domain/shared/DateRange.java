@@ -3,9 +3,6 @@ package com.conceptualware.domain.shared;
 import java.time.Instant;
 import java.time.Duration;
 
-/**
- * Concept #12 — DDD: Value Object — intervalo temporal imutável e auto-validado.
- */
 public record DateRange(Instant start, Instant end) {
 
     public DateRange {

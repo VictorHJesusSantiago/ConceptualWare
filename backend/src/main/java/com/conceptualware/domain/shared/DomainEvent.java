@@ -3,11 +3,6 @@ package com.conceptualware.domain.shared;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * Concept #12 — DDD: Evento de Domínio — imutável, carrega o que aconteceu
- * Concept #7  — OOP: Record (Java 16+), sealed interface (Java 17+)
- * Concept #12 — Event-Driven Architecture, Event Sourcing
- */
 public abstract class DomainEvent {
 
     private final String eventId = UUID.randomUUID().toString();

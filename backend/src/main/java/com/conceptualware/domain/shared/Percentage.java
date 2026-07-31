@@ -1,9 +1,5 @@
 package com.conceptualware.domain.shared;
 
-/**
- * Concept #12 — DDD: Value Object — imutável, sem identidade própria,
- * igualdade estrutural (por valor), auto-validado no construtor.
- */
 public record Percentage(double value) {
 
     public Percentage {
