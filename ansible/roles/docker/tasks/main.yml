@@ -1,19 +1,4 @@
-# Concept #22 — Ansible Role: docker
-#
-# Role: installs and configures Docker Engine on Debian/Ubuntu.
-# Idempotent: safe to re-run — apt module checks if package is already present.
-#
-# Role directory structure:
-#   roles/docker/
-#     tasks/main.yml     ← this file
-#     handlers/main.yml  ← restart docker on config change
-#     defaults/main.yml  ← default variable values (lowest precedence)
-#     templates/         ← Jinja2 templates (daemon.json.j2)
-#     files/             ← static files (no templating needed)
-#     meta/main.yml      ← role metadata, dependencies
 ---
-
-# ── Prerequisites ──────────────────────────────────────────────────────────────
 
 - name: Remove old Docker versions
   apt:
@@ -24,7 +9,7 @@
       - containerd
       - runc
     state: absent
-  ignore_errors: yes   # OK if packages were never installed
+  ignore_errors: yes
 
 - name: Install Docker prerequisites
   apt:
@@ -35,8 +20,6 @@
       - gnupg
       - lsb-release
     state: present
-
-# ── Docker APT repository ──────────────────────────────────────────────────────
 
 - name: Add Docker GPG key
   apt_key:
@@ -53,8 +36,6 @@
     state: present
     filename: docker
 
-# ── Install Docker Engine ──────────────────────────────────────────────────────
-
 - name: Install Docker Engine
   apt:
     name:
@@ -67,8 +48,6 @@
     update_cache: yes
   notify: Restart Docker
 
-# ── Docker daemon configuration ────────────────────────────────────────────────
-
 - name: Configure Docker daemon
   template:
     src: daemon.json.j2
@@ -76,15 +55,11 @@
     mode: "0644"
   notify: Restart Docker
 
-# ── Docker service ─────────────────────────────────────────────────────────────
-
 - name: Start and enable Docker service
   service:
     name: docker
     state: started
     enabled: yes
-
-# ── Docker Compose plugin verification ────────────────────────────────────────
 
 - name: Verify docker compose plugin
   command: docker compose version

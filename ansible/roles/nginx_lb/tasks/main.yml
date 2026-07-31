@@ -1,18 +1,4 @@
-# Concept #22 — Ansible Role: nginx_lb (NGINX Load Balancer)
-#
-# Configures NGINX as a Layer-7 load balancer (upstream proxy) in front
-# of the ConceptualWare gateway nodes.
-#
-# Load balancing methods (Concept #22 — Service Mesh / Load Balancing):
-#   round_robin    (default) — requests distributed sequentially
-#   least_conn     — send to server with fewest active connections
-#   ip_hash        — sticky sessions by client IP (preserves WebSocket)
-#   random         — random selection (two: pick 2, select better)
-#
-# This role uses least_conn for the API path and ip_hash for WebSocket.
 ---
-
-# ── Install ────────────────────────────────────────────────────────────────────
 
 - name: Install NGINX
   apt:
@@ -27,15 +13,11 @@
       - python3-certbot-nginx
     state: present
 
-# ── Remove default site ────────────────────────────────────────────────────────
-
 - name: Remove default NGINX site
   file:
     path: /etc/nginx/sites-enabled/default
     state: absent
   notify: Reload NGINX
-
-# ── Generate configuration ────────────────────────────────────────────────────
 
 - name: Deploy NGINX upstream configuration
   template:
@@ -58,8 +40,6 @@
     state: link
   notify: Reload NGINX
 
-# ── TLS / SSL ─────────────────────────────────────────────────────────────────
-
 - name: Create TLS certificate directory
   file:
     path: /etc/nginx/ssl
@@ -81,22 +61,16 @@
   no_log: true
   notify: Reload NGINX
 
-# ── Test configuration before reload ─────────────────────────────────────────
-
 - name: Test NGINX configuration
   command: nginx -t
   changed_when: false
   notify: Reload NGINX
-
-# ── Service ────────────────────────────────────────────────────────────────────
 
 - name: Start and enable NGINX
   service:
     name: nginx
     state: started
     enabled: yes
-
-# ── Verify ────────────────────────────────────────────────────────────────────
 
 - name: Verify NGINX is listening on port 443
   wait_for:
