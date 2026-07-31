@@ -1,4 +1,3 @@
-# ── Build Stage ────────────────────────────────────────────────────────────────
 FROM maven:3.9.6-eclipse-temurin-21 AS builder
 
 WORKDIR /app
@@ -9,7 +8,6 @@ RUN mvn dependency:go-offline -q
 COPY src ./src
 RUN mvn package -DskipTests -q
 
-# ── Runtime Stage ──────────────────────────────────────────────────────────────
 FROM eclipse-temurin:21-jre-alpine
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
@@ -22,7 +20,6 @@ USER appuser
 
 EXPOSE 8080
 
-# Java 21 Virtual Threads & performance flags
 ENTRYPOINT ["java", \
   "-XX:+UseZGC", \
   "-XX:+ZGenerational", \
