@@ -2,11 +2,6 @@ package com.conceptualware.core.datastructures.linear;
 
 import java.util.EmptyStackException;
 
-/**
- * Concept #4 — Pilha (Stack), Fila (Queue), Deque, Fila de prioridade
- * Concept #9 — Memória Stack vs Heap (Stack = LIFO call frame)
- * Concept #17 — Memória virtual, stack frames
- */
 public class Stack<T> {
 
     private static class Node<T> {
@@ -17,7 +12,6 @@ public class Stack<T> {
     private Node<T> top;
     private int size;
 
-    /** LIFO — Last In, First Out. */
     public void push(T item) {
         top = new Node<>(item, top);
         size++;
@@ -39,9 +33,6 @@ public class Stack<T> {
     public boolean isEmpty() { return top == null; }
     public int size()        { return size; }
 
-    // ── Stack Applications ────────────────────────────────────────────────────
-
-    /** Check balanced parentheses — classic stack use case. */
     public static boolean isBalanced(String s) {
         Stack<Character> stack = new Stack<>();
         for (char c : s.toCharArray()) {
@@ -58,7 +49,6 @@ public class Stack<T> {
         return stack.isEmpty();
     }
 
-    /** Evaluate postfix (RPN) expression — stack-based evaluation. */
     public static double evaluateRPN(String[] tokens) {
         Stack<Double> stack = new Stack<>();
         for (String token : tokens) {
@@ -73,19 +63,15 @@ public class Stack<T> {
         return stack.pop();
     }
 
-    // ── Queue ────────────────────────────────────────────────────────────────
-
     public static class Queue<T> {
         private final LinkedList.DoublyLinkedList<T> list = new LinkedList.DoublyLinkedList<>();
 
-        public void enqueue(T item) { list.addLast(item); }  // FIFO
+        public void enqueue(T item) { list.addLast(item); }
         public T dequeue()           { return list.removeFirst(); }
         public T peek()              { return list.peekFirst(); }
         public boolean isEmpty()     { return list.isEmpty(); }
         public int size()            { return list.size(); }
     }
-
-    // ── Deque (Double-ended Queue) ─────────────────────────────────────────────
 
     public static class Deque<T> {
         private final LinkedList.DoublyLinkedList<T> list = new LinkedList.DoublyLinkedList<>();
@@ -99,8 +85,6 @@ public class Stack<T> {
         public boolean isEmpty()      { return list.isEmpty(); }
         public int size()             { return list.size(); }
     }
-
-    // ── Circular Buffer / Ring Buffer ─────────────────────────────────────────
 
     public static class CircularBuffer<T> {
         private final Object[] buffer;

@@ -3,16 +3,7 @@ package com.conceptualware.core.datastructures.linear;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-/**
- * Concept #4 — Estruturas de Dados Lineares:
- *   Lista ligada simples, Lista duplamente ligada, Lista circular
- *
- * Concept #7 — OOP: Generic class, encapsulation, inner class, iterator pattern
- * Concept #8 — FP: Iterable, generic types
- */
 public class LinkedList<T> implements Iterable<T> {
-
-    // ── Singly Linked List ───────────────────────────────────────────────────
 
     private static class Node<T> {
         T data;
@@ -69,7 +60,6 @@ public class LinkedList<T> implements Iterable<T> {
         head = prev;
     }
 
-    /** Floyd's cycle detection — Concept #5. */
     public boolean hasCycle() {
         Node<T> slow = head, fast = head;
         while (fast != null && fast.next != null) {
@@ -96,8 +86,6 @@ public class LinkedList<T> implements Iterable<T> {
             }
         };
     }
-
-    // ── Doubly Linked List ───────────────────────────────────────────────────
 
     public static class DoublyLinkedList<T> implements Iterable<T> {
 
@@ -161,10 +149,8 @@ public class LinkedList<T> implements Iterable<T> {
         }
     }
 
-    // ── Circular Linked List ────────────────────────────────────────────────
-
     public static class CircularLinkedList<T> {
-        private Node<T> tail; // tail.next == head (the sentinel back-link)
+        private Node<T> tail;
         private int size;
 
         private static class Node<T> { T data; Node<T> next; Node(T d) { data = d; } }
