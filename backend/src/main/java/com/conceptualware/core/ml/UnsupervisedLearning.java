@@ -2,47 +2,8 @@ package com.conceptualware.core.ml;
 
 import java.util.*;
 
-/**
- * Concept #30 — Unsupervised Machine Learning:
- *
- *   Unsupervised learning finds structure in UNLABELED data.
- *   No target variable y — the algorithm must discover patterns on its own.
- *
- *   CLUSTERING (group similar examples):
- *     K-Means:        partition into k clusters by centroid proximity
- *     DBSCAN:         density-based — finds arbitrary-shaped clusters + outliers
- *     Hierarchical:   build a dendrogram, cut at desired # clusters
- *
- *   DIMENSIONALITY REDUCTION (compress features):
- *     PCA (Principal Component Analysis):
- *       Find orthogonal directions (principal components) of maximum variance.
- *       Project data onto top-k components → preserves most information.
- *       Mathematically: eigendecomposition of the covariance matrix.
- *
- *     t-SNE (conceptual — not implemented numerically due to complexity):
- *       Preserves local structure, good for visualization; not suitable for new data.
- *
- *   ANOMALY DETECTION:
- *     Isolation Forest (concept): randomly isolate points — anomalies isolated faster.
- */
 public class UnsupervisedLearning {
 
-    // ── K-MEANS CLUSTERING ────────────────────────────────────────────────────
-    /**
-     * Algorithm (Lloyd's):
-     *   1. Initialize k centroids (random or k-means++ smart init)
-     *   2. Assign each point to nearest centroid  → O(n·k·d)
-     *   3. Recompute centroids as mean of cluster  → O(n·d)
-     *   4. Repeat until centroids don't move (convergence) or maxIter
-     *
-     * k-means++ initialization:
-     *   Choose first centroid uniformly at random.
-     *   Each subsequent centroid chosen with probability ∝ D(x)² (squared distance to nearest existing centroid).
-     *   Reduces initialization sensitivity, gives O(log k) approximation guarantee.
-     *
-     * Elbow method: plot inertia (within-cluster SSE) vs k → pick "elbow" k.
-     * Silhouette score: measures how well-separated clusters are (-1 to 1, higher=better).
-     */
     public static class KMeans {
         private double[][] centroids;
         private int[] labels;
@@ -62,15 +23,13 @@ public class UnsupervisedLearning {
             labels = new int[n];
 
             for (int iter = 0; iter < maxIter; iter++) {
-                // Assign step
                 boolean changed = false;
                 for (int i = 0; i < n; i++) {
                     int newLabel = nearestCentroid(X[i]);
                     if (newLabel != labels[i]) { labels[i] = newLabel; changed = true; }
                 }
-                if (!changed) break; // convergence
+                if (!changed) break;
 
-                // Update step: recompute centroids
                 double[][] sums = new double[k][d];
                 int[] counts = new int[k];
                 for (int i = 0; i < n; i++) {
@@ -82,7 +41,6 @@ public class UnsupervisedLearning {
                 }
             }
 
-            // Compute inertia (within-cluster sum of squared distances)
             inertia = 0;
             for (int i = 0; i < n; i++) inertia += squaredDist(X[i], centroids[labels[i]]);
         }
@@ -101,7 +59,6 @@ public class UnsupervisedLearning {
                     distances[i] = minDist;
                     total += minDist;
                 }
-                // Weighted random selection
                 double rand = rng.nextDouble() * total;
                 double cumul = 0;
                 for (int i = 0; i < n; i++) {
@@ -132,7 +89,6 @@ public class UnsupervisedLearning {
             return sum;
         }
 
-        /** Silhouette score: (b - a) / max(a, b). Range [-1, 1]. Higher is better. */
         public double silhouetteScore(double[][] X) {
             int n = X.length;
             double totalSil = 0;
@@ -161,7 +117,6 @@ public class UnsupervisedLearning {
             return minDist;
         }
 
-        /** Elbow analysis: fit k-means for k=2..maxK, return inertias. */
         public static double[] elbowAnalysis(double[][] X, int maxK, int maxIter) {
             double[] inertias = new double[maxK - 1];
             for (int k = 2; k <= maxK; k++) {
@@ -173,19 +128,8 @@ public class UnsupervisedLearning {
         }
     }
 
-    // ── DBSCAN ────────────────────────────────────────────────────────────────
-    /**
-     * Density-Based Spatial Clustering of Applications with Noise.
-     *   Parameters: eps (neighborhood radius), minPts (min points for core point)
-     *   Core point:    has ≥ minPts neighbors within eps
-     *   Border point:  within eps of a core point, but < minPts own neighbors
-     *   Noise point:   neither core nor border → outlier (label = -1)
-     *
-     *   Advantage over k-means: discovers arbitrary-shaped clusters, handles noise.
-     *   Disadvantage: sensitive to eps/minPts; struggles with varying densities.
-     */
     public static class DBSCAN {
-        private int[] labels; // -1 = noise, ≥0 = cluster id
+        private int[] labels;
         private final double eps;
         private final int minPts;
 
@@ -194,13 +138,13 @@ public class UnsupervisedLearning {
         public int[] fit(double[][] X) {
             int n = X.length;
             labels = new int[n];
-            Arrays.fill(labels, -2); // -2 = unvisited
+            Arrays.fill(labels, -2);
             int clusterLabel = 0;
 
             for (int i = 0; i < n; i++) {
                 if (labels[i] != -2) continue;
                 List<Integer> neighbors = regionQuery(X, i);
-                if (neighbors.size() < minPts) { labels[i] = -1; continue; } // noise
+                if (neighbors.size() < minPts) { labels[i] = -1; continue; }
                 expandCluster(X, i, neighbors, clusterLabel++);
             }
             return labels.clone();
@@ -211,7 +155,7 @@ public class UnsupervisedLearning {
             Queue<Integer> queue = new LinkedList<>(neighbors);
             while (!queue.isEmpty()) {
                 int q = queue.poll();
-                if (labels[q] == -1) labels[q] = label; // border → cluster
+                if (labels[q] == -1) labels[q] = label;
                 if (labels[q] != -2) continue;
                 labels[q] = label;
                 List<Integer> qNeighbors = regionQuery(X, q);
@@ -233,26 +177,9 @@ public class UnsupervisedLearning {
         public int numNoise()    { return (int) Arrays.stream(labels).filter(l -> l == -1).count(); }
     }
 
-    // ── PCA (PRINCIPAL COMPONENT ANALYSIS) ────────────────────────────────────
-    /**
-     * Finds orthogonal axes of maximum variance (principal components).
-     *
-     *   Algorithm:
-     *     1. Center data: X_c = X - μ
-     *     2. Compute covariance matrix: C = (1/n) Xᵀ_c X_c  [p×p]
-     *     3. Eigendecomposition: C = V Λ Vᵀ (columns of V = eigenvectors)
-     *     4. Sort eigenvectors by eigenvalue (descending variance)
-     *     5. Project: Z = X_c · V[:, :k]  [n×k]
-     *
-     *   We use power iteration (deflation) for eigendecomposition since n >> p
-     *   is the typical case and we only need top-k eigenvectors.
-     *
-     *   Explained variance ratio[i] = λᵢ / Σ λⱼ
-     *   Cumulative explained variance helps choose k (e.g., keep 95% variance).
-     */
     public static class PCA {
         private double[] mean;
-        private double[][] components;    // [k × p] — top-k eigenvectors
+        private double[][] components;
         private double[] explainedVarianceRatio;
         private int numComponents;
 
@@ -261,21 +188,18 @@ public class UnsupervisedLearning {
             this.numComponents = k;
             this.mean = new double[p];
 
-            // Step 1: Center data
             for (int i = 0; i < n; i++) for (int j = 0; j < p; j++) mean[j] += X[i][j];
             for (int j = 0; j < p; j++) mean[j] /= n;
 
             double[][] Xc = new double[n][p];
             for (int i = 0; i < n; i++) for (int j = 0; j < p; j++) Xc[i][j] = X[i][j] - mean[j];
 
-            // Step 2: Covariance matrix C = Xᵀ X / n  [p×p]
             double[][] C = new double[p][p];
             for (int a = 0; a < p; a++) for (int b = 0; b < p; b++) {
                 for (int i = 0; i < n; i++) C[a][b] += Xc[i][a] * Xc[i][b];
                 C[a][b] /= n;
             }
 
-            // Step 3-4: Power iteration + deflation for top-k eigenvectors
             Matrix cov = new Matrix(C);
             components = new double[k][];
             double[] eigenvalues = new double[k];
@@ -283,20 +207,16 @@ public class UnsupervisedLearning {
                 double[] ev = cov.dominantEigenvector(100);
                 eigenvalues[c] = cov.eigenvalue(ev);
                 components[c] = ev;
-                // Deflate: remove this component from covariance matrix
-                // C := C - λ vvᵀ
                 for (int a = 0; a < p; a++) for (int b = 0; b < p; b++)
                     C[a][b] -= eigenvalues[c] * ev[a] * ev[b];
                 cov = new Matrix(C);
             }
 
-            // Explained variance ratio
             double totalVar = Arrays.stream(eigenvalues).sum();
             explainedVarianceRatio = new double[k];
             for (int c = 0; c < k; c++) explainedVarianceRatio[c] = eigenvalues[c] / totalVar;
         }
 
-        /** Project n×p data onto n×k PCA space. */
         public double[][] transform(double[][] X) {
             int n = X.length, p = X[0].length, k = numComponents;
             double[][] Z = new double[n][k];
@@ -322,15 +242,9 @@ public class UnsupervisedLearning {
         public double[][] components() { return components; }
     }
 
-    // ── HIERARCHICAL CLUSTERING ────────────────────────────────────────────────
-    /**
-     * Agglomerative (bottom-up): each point starts as its own cluster.
-     * Merge the two closest clusters until only one remains → dendrogram.
-     * Linkage methods: Single (min), Complete (max), Average, Ward.
-     */
     public static class HierarchicalClustering {
         private final int maxClusters;
-        private final String linkage; // "single", "complete", "average"
+        private final String linkage;
 
         public HierarchicalClustering(int maxClusters, String linkage) {
             this.maxClusters = maxClusters;
@@ -371,7 +285,7 @@ public class UnsupervisedLearning {
                     for (int a : ca) for (int b : cb) max = Math.max(max, euclidean(X[a], X[b]));
                     yield max;
                 }
-                default -> { // average
+                default -> {
                     double sum = 0;
                     for (int a : ca) for (int b : cb) sum += euclidean(X[a], X[b]);
                     yield sum / (ca.size() * cb.size());
