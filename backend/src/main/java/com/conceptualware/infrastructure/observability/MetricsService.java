@@ -8,30 +8,19 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
-/**
- * Concept #27 — Observabilidade e Monitoramento:
- *   Métricas: Counter, Gauge, Histogram, Timer
- *   APM, SLI, SLO, Error Budget
- *   Logs estruturados, Trace ID
- *
- * Concept #26 — Performance: Profiling via métricas, benchmarking
- */
 @Service
 @Slf4j
 public class MetricsService {
 
     private final MeterRegistry registry;
 
-    // Counters (Concept #27)
     private final Counter algorithmExecutions;
     private final Counter challengeSubmissions;
     private final Counter authAttempts;
     private final Counter authFailures;
 
-    // Gauges (Concept #27)
     private final AtomicInteger activeUsers;
 
-    // Timers / Histograms (Concept #27)
     private final Timer algorithmExecutionTimer;
     private final DistributionSummary inputSizeSummary;
 
@@ -70,8 +59,6 @@ public class MetricsService {
             .register(registry);
     }
 
-    // ── Recording Methods ────────────────────────────────────────────────────
-
     public void recordAlgorithmExecution(String algorithmName, int inputSize) {
         algorithmExecutions.increment();
         inputSizeSummary.record(inputSize);
@@ -103,13 +90,9 @@ public class MetricsService {
     public void incrementActiveUsers()  { activeUsers.incrementAndGet(); }
     public void decrementActiveUsers()  { activeUsers.decrementAndGet(); }
 
-    // ── Health Check support (Concept #27) ───────────────────────────────────
-
     public void recordHealthCheck(String component, boolean healthy) {
         registry.gauge("health.status", Tags.of("component", component), healthy ? 1 : 0);
     }
-
-    // ── SLI tracking (Concept #27) ────────────────────────────────────────────
 
     public void recordRequestOutcome(String endpoint, int statusCode, long durationMs) {
         Tags tags = Tags.of(
