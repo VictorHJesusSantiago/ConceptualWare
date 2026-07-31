@@ -19,11 +19,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/**
- * Concept #16 — HTTP: Bearer token, Authorization header
- * Concept #21 — Segurança: Filter chain, token validation, RBAC
- * Concept #27 — Observabilidade: Trace ID, MDC (Mapped Diagnostic Context)
- */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -36,7 +31,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
 
-        // Distributed tracing — generate or propagate Trace ID (Concept #27)
         String traceId = request.getHeader("X-Trace-ID");
         if (traceId == null) traceId = UUID.randomUUID().toString().substring(0, 8);
         MDC.put("traceId", traceId);
@@ -59,7 +53,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             filterChain.doFilter(request, response);
         } finally {
-            MDC.clear(); // Always clear MDC to prevent memory leaks
+            MDC.clear();
         }
     }
 

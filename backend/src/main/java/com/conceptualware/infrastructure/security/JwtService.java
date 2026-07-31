@@ -11,12 +11,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.*;
 
-/**
- * Concept #21 — Segurança: JWT, token de acesso e refresh token,
- *   Rotação de chaves, Gerenciamento de sessões
- * Concept #16 — HTTP: Authorization header, Bearer token
- * Concept #11 — Payload: claims, subject, expiration (JSON)
- */
 @Service
 @Slf4j
 public class JwtService {
@@ -30,13 +24,10 @@ public class JwtService {
         @Value("${app.jwt.access-token-expiration:900000}") long accessTokenExpiration,
         @Value("${app.jwt.refresh-token-expiration:604800000}") long refreshTokenExpiration
     ) {
-        // HMAC-SHA-256 key (Concept #21 — Criptografia simétrica)
         this.signingKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.accessTokenExpiration = accessTokenExpiration;
         this.refreshTokenExpiration = refreshTokenExpiration;
     }
-
-    // ── Access Token ─────────────────────────────────────────────────────────
 
     public String generateAccessToken(String userId, String email, Set<String> roles) {
         return Jwts.builder()
@@ -50,20 +41,16 @@ public class JwtService {
             .compact();
     }
 
-    // ── Refresh Token ─────────────────────────────────────────────────────────
-
     public String generateRefreshToken(String userId) {
         return Jwts.builder()
             .subject(userId)
             .claim("type", "refresh")
-            .claim("jti", UUID.randomUUID().toString()) // JWT ID for revocation
+            .claim("jti", UUID.randomUUID().toString())
             .issuedAt(Date.from(Instant.now()))
             .expiration(Date.from(Instant.now().plusMillis(refreshTokenExpiration)))
             .signWith(signingKey)
             .compact();
     }
-
-    // ── Validation ────────────────────────────────────────────────────────────
 
     public boolean validateToken(String token) {
         try {
