@@ -6,26 +6,8 @@ import java.util.concurrent.atomic.*;
 import java.util.concurrent.locks.*;
 import java.util.function.*;
 
-/**
- * Concept #17 — Sistemas Operacionais e Concorrência:
- *   Thread, Mutex, Semáforo, Monitor, Spinlock, Variável de condição,
- *   Deadlock, Race condition, Barreira de memória, Thread-local storage
- *   Lock otimista/pessimista, Lock-free, Wait-free
- *
- * Concept #18 — Programação Assíncrona e Concorrente:
- *   CompletableFuture, Thread Pool, Work-stealing scheduler,
- *   Semáforo assíncrono, Rate limiting assíncrono, Debounce, Throttle,
- *   Structured Concurrency, Virtual Threads (Project Loom)
- */
 public class ConcurrencyUtils {
 
-    // ── Structured Concurrency — StructuredTaskScope (JEP 453, preview) ───────
-
-    /**
-     * Fan-out/fan-in: dispara N tarefas em Virtual Threads e falha rápido se
-     * qualquer uma lançar exceção (ShutdownOnFailure) — todas as tarefas irmãs
-     * são canceladas automaticamente ("structured": nenhuma thread escapa do escopo).
-     */
     public static <T> List<T> structuredFanOut(List<Callable<T>> tasks) throws InterruptedException, ExecutionException {
         try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
             List<StructuredTaskScope.Subtask<T>> subtasks = new ArrayList<>();
@@ -40,10 +22,6 @@ public class ConcurrencyUtils {
         }
     }
 
-    /**
-     * Corrida entre tarefas: retorna o primeiro resultado bem-sucedido e cancela
-     * as demais (ShutdownOnSuccess) — útil para chamadas redundantes a réplicas.
-     */
     public static <T> T structuredRace(List<Callable<T>> tasks) throws InterruptedException, ExecutionException {
         try (var scope = new StructuredTaskScope.ShutdownOnSuccess<T>()) {
             for (Callable<T> task : tasks) scope.fork(task::call);
@@ -52,23 +30,15 @@ public class ConcurrencyUtils {
         }
     }
 
-    // ── Virtual Threads vs Platform Threads — benchmark comparativo ──────────
-
     public record ThreadBenchmarkResult(String mode, int taskCount, long elapsedMillis, long peakThreadsEstimate) {}
 
-    /**
-     * Compara throughput de N tarefas I/O-bound (simuladas com sleep) executando
-     * em Virtual Threads vs. um pool fixo de Platform Threads. Virtual Threads
-     * escalam para dezenas de milhares de tarefas sem exaurir memória do SO;
-     * Platform Threads são limitados pelo tamanho do pool.
-     */
     public static ThreadBenchmarkResult benchmarkVirtualThreads(int taskCount, int simulatedIoMillis) throws InterruptedException {
         long start = System.currentTimeMillis();
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             CountDownLatch latch = new CountDownLatch(taskCount);
             for (int i = 0; i < taskCount; i++) {
                 executor.submit(() -> {
-                    try { Thread.sleep(simulatedIoMillis); } catch (InterruptedException ignored) {}
+                    try { Thread.sleep(simulatedIoMillis); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
                     latch.countDown();
                 });
             }
@@ -83,7 +53,7 @@ public class ConcurrencyUtils {
             CountDownLatch latch = new CountDownLatch(taskCount);
             for (int i = 0; i < taskCount; i++) {
                 executor.submit(() -> {
-                    try { Thread.sleep(simulatedIoMillis); } catch (InterruptedException ignored) {}
+                    try { Thread.sleep(simulatedIoMillis); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
                     latch.countDown();
                 });
             }
@@ -92,20 +62,16 @@ public class ConcurrencyUtils {
         return new ThreadBenchmarkResult("platform", taskCount, System.currentTimeMillis() - start, poolSize);
     }
 
-    // ── Thread-local storage (Concept #17) ────────────────────────────────────
-
     private static final ThreadLocal<String> EXECUTION_CONTEXT = ThreadLocal.withInitial(() -> "default");
 
     public static void setContext(String ctx) { EXECUTION_CONTEXT.set(ctx); }
     public static String getContext()         { return EXECUTION_CONTEXT.get(); }
     public static void clearContext()         { EXECUTION_CONTEXT.remove(); }
 
-    // ── Mutex / ReentrantLock (Concept #17) ───────────────────────────────────
-
     public static class BoundedBuffer<T> {
         private final Queue<T> buffer;
         private final int capacity;
-        private final Lock lock = new ReentrantLock(true); // fair=true (prevents starvation)
+        private final Lock lock = new ReentrantLock(true);
         private final Condition notFull  = lock.newCondition();
         private final Condition notEmpty = lock.newCondition();
 
@@ -140,8 +106,6 @@ public class ConcurrencyUtils {
         public int size() { return buffer.size(); }
     }
 
-    // ── Semaphore (Concept #17) ───────────────────────────────────────────────
-
     public static class RateLimiter {
         private final Semaphore semaphore;
         private final int permitsPerWindow;
@@ -152,9 +116,8 @@ public class ConcurrencyUtils {
             this.windowMs = windowMs;
             this.semaphore = new Semaphore(permitsPerWindow, true);
 
-            // Refill permits on schedule (sliding window)
             ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(
-                Thread.ofVirtual().factory()); // Virtual Thread (Concept #17)
+                Thread.ofVirtual().factory());
             scheduler.scheduleAtFixedRate(() -> {
                 int deficit = permitsPerWindow - semaphore.availablePermits();
                 if (deficit > 0) semaphore.release(deficit);
@@ -165,14 +128,12 @@ public class ConcurrencyUtils {
         public void acquire() throws InterruptedException { semaphore.acquire(); }
     }
 
-    // ── Read-Write Lock — optimistic/pessimistic (Concept #17) ────────────────
-
     public static class ReadWriteCache<K, V> {
         private final Map<K, V> cache = new HashMap<>();
         private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
 
         public V get(K key) {
-            rwLock.readLock().lock(); // Multiple readers allowed
+            rwLock.readLock().lock();
             try {
                 return cache.get(key);
             } finally {
@@ -181,7 +142,7 @@ public class ConcurrencyUtils {
         }
 
         public void put(K key, V value) {
-            rwLock.writeLock().lock(); // Exclusive write access
+            rwLock.writeLock().lock();
             try {
                 cache.put(key, value);
             } finally {
@@ -189,8 +150,6 @@ public class ConcurrencyUtils {
             }
         }
     }
-
-    // ── Atomic Operations — Lock-free (Concept #17) ───────────────────────────
 
     public static class LockFreeCounter {
         private final AtomicLong count = new AtomicLong(0);
@@ -200,15 +159,11 @@ public class ConcurrencyUtils {
         public long addAndGet(long delta)  { return count.addAndGet(delta); }
         public long get()                  { return count.get(); }
 
-        /** CAS — Compare and Set (wait-free operation). */
         public boolean compareAndSet(long expected, long update) {
             return count.compareAndSet(expected, update);
         }
     }
 
-    // ── CompletableFuture — Async composition (Concept #18) ──────────────────
-
-    /** Execute multiple algorithms in parallel and combine results. */
     public static CompletableFuture<List<Integer>> parallelSort(
             int[] arr, Executor executor) {
 
@@ -234,7 +189,6 @@ public class ConcurrencyUtils {
         });
     }
 
-    /** Timeout with fallback — Circuit Breaker pattern (Concept #12). */
     public static <T> CompletableFuture<T> withTimeout(
             CompletableFuture<T> future, long timeoutMs, T fallback) {
         CompletableFuture<T> timeout = new CompletableFuture<>();
@@ -242,8 +196,6 @@ public class ConcurrencyUtils {
         scheduler.schedule(() -> timeout.complete(fallback), timeoutMs, TimeUnit.MILLISECONDS);
         return future.applyToEither(timeout, Function.identity());
     }
-
-    // ── Debounce — Concept #18 / #26 ─────────────────────────────────────────
 
     public static class Debouncer<T> {
         private final long delayMs;
@@ -262,8 +214,6 @@ public class ConcurrencyUtils {
         }
     }
 
-    // ── Throttle — Concept #18 / #26 ─────────────────────────────────────────
-
     public static class Throttler {
         private final long periodMs;
         private volatile long lastCallMs = 0;
@@ -281,25 +231,20 @@ public class ConcurrencyUtils {
         }
     }
 
-    // ── Memory Barrier / Volatile semantics ───────────────────────────────────
-
     public static class VisibilityExample {
-        // volatile ensures write is visible to other threads (memory barrier)
         private volatile boolean ready = false;
         private int value = 0;
 
         public void writer() {
             value = 42;
-            ready = true; // memory fence — all prior writes visible after this
+            ready = true;
         }
 
         public int reader() {
-            while (!ready) Thread.onSpinWait(); // spin (spinlock) — Concept #17
+            while (!ready) Thread.onSpinWait();
             return value;
         }
     }
-
-    // ── Fork/Join Work-Stealing Parallel Algorithm ────────────────────────────
 
     public static class ParallelMergeSort extends RecursiveTask<int[]> {
         private static final int THRESHOLD = 1000;
@@ -315,7 +260,7 @@ public class ConcurrencyUtils {
             int mid = arr.length / 2;
             ParallelMergeSort left  = new ParallelMergeSort(Arrays.copyOfRange(arr, 0, mid));
             ParallelMergeSort right = new ParallelMergeSort(Arrays.copyOfRange(arr, mid, arr.length));
-            left.fork();  // submit to work-stealing thread pool
+            left.fork();
             int[] r = right.compute();
             int[] l = left.join();
             return mergeArrays(l, r);
@@ -331,7 +276,6 @@ public class ConcurrencyUtils {
         }
     }
 
-    /** Run parallel merge sort using ForkJoinPool (work-stealing). */
     public static int[] forkJoinSort(int[] arr) {
         return ForkJoinPool.commonPool().invoke(new ParallelMergeSort(arr));
     }
