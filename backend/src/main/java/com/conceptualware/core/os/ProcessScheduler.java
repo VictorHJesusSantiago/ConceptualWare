@@ -3,44 +3,13 @@ package com.conceptualware.core.os;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * Concept #17 — Process Scheduling Algorithms (Escalonamento de Processos):
- *
- *   FIFO / FCFS — First Come, First Served:
- *     Processes run in arrival order until completion. No preemption.
- *     Problem: convoy effect — short jobs stuck behind long ones.
- *
- *   Round-Robin (RR):
- *     Each process gets a fixed time quantum, then preempted and queued again.
- *     Fair, used by most modern OS kernels. Quantum = 10-100ms in Linux.
- *
- *   SJF — Shortest Job First (non-preemptive):
- *     Runs the process with shortest burst time. Minimizes average waiting time.
- *     Problem: starvation of long processes, requires knowing burst time in advance.
- *
- *   SRTF — Shortest Remaining Time First (preemptive SJF):
- *     Preempts current process if a new arrival has shorter remaining time.
- *     Optimal average waiting time, but high context switch overhead.
- *
- *   Priority Scheduling:
- *     Each process has a priority. Highest priority runs first.
- *     Problem: starvation — low priority processes may never run (solved by aging).
- *
- *   Multilevel Queue:
- *     Separate queues for different process categories (foreground/background).
- *     Linux CFS (Completely Fair Scheduler) is based on this concept.
- *
- * Concept #17 — Operating systems, concurrent execution, time-sharing
- */
 public class ProcessScheduler {
-
-    // ── Process representation ────────────────────────────────────────────────
 
     public record Process(
         int    id,
         int    arrivalTime,
         int    burstTime,
-        int    priority      // lower number = higher priority
+        int    priority
     ) {
         @Override public String toString() {
             return "P%d(arr=%d,burst=%d,pri=%d)".formatted(id, arrivalTime, burstTime, priority);
@@ -69,8 +38,6 @@ public class ProcessScheduler {
         }
     }
 
-    // ── FIFO / FCFS ───────────────────────────────────────────────────────────
-
     public static SchedulerStats fcfs(List<Process> processes) {
         List<Process> sorted = processes.stream()
             .sorted(Comparator.comparingInt(Process::arrivalTime))
@@ -93,10 +60,7 @@ public class ProcessScheduler {
         return computeStats("FCFS", results, currentTime - sorted.get(0).arrivalTime());
     }
 
-    // ── Round-Robin ───────────────────────────────────────────────────────────
-
     public static SchedulerStats roundRobin(List<Process> processes, int quantum) {
-        // Mutable remaining burst times
         Map<Integer, Integer> remaining = new HashMap<>();
         Map<Integer, Integer> firstResponse = new HashMap<>();
         processes.forEach(p -> remaining.put(p.id(), p.burstTime()));
@@ -126,12 +90,11 @@ public class ProcessScheduler {
             time += exec;
             remaining.merge(p.id(), -exec, Integer::sum);
 
-            // Admit newly arrived processes before re-queuing current
             while (idx < sorted.size() && sorted.get(idx).arrivalTime() <= time)
                 ready.add(sorted.get(idx++));
 
             if (remaining.get(p.id()) > 0) {
-                ready.add(p); // preempt: put back at end of queue
+                ready.add(p);
             } else {
                 finishTimes.put(p.id(), time);
             }
@@ -150,15 +113,12 @@ public class ProcessScheduler {
         return computeStats("Round-Robin(q=" + quantum + ")", results, totalTime);
     }
 
-    // ── SJF (non-preemptive) ──────────────────────────────────────────────────
-
     public static SchedulerStats sjf(List<Process> processes) {
         List<Process> remaining = new ArrayList<>(processes);
         List<ScheduleResult> results = new ArrayList<>();
         int time = 0;
 
         while (!remaining.isEmpty()) {
-            // Among all processes that have arrived, pick shortest burst
             int finalTime = time;
             Optional<Process> shortest = remaining.stream()
                 .filter(p -> p.arrivalTime() <= finalTime)
@@ -185,8 +145,6 @@ public class ProcessScheduler {
                       - processes.stream().mapToInt(Process::arrivalTime).min().orElse(0);
         return computeStats("SJF (non-preemptive)", results, totalTime);
     }
-
-    // ── SRTF (preemptive SJF) ────────────────────────────────────────────────
 
     public static SchedulerStats srtf(List<Process> processes) {
         Map<Integer, Integer> remaining = new HashMap<>();
@@ -226,8 +184,6 @@ public class ProcessScheduler {
         return computeStats("SRTF (preemptive)", results, totalTime);
     }
 
-    // ── Priority Scheduling (non-preemptive) ─────────────────────────────────
-
     public static SchedulerStats priorityScheduling(List<Process> processes) {
         List<Process> remaining = new ArrayList<>(processes);
         List<ScheduleResult> results = new ArrayList<>();
@@ -237,7 +193,7 @@ public class ProcessScheduler {
             int finalTime = time;
             Optional<Process> highest = remaining.stream()
                 .filter(p -> p.arrivalTime() <= finalTime)
-                .min(Comparator.comparingInt(Process::priority)); // lower number = higher priority
+                .min(Comparator.comparingInt(Process::priority));
 
             if (highest.isEmpty()) {
                 time = remaining.stream().mapToInt(Process::arrivalTime).min().orElseThrow();
@@ -261,13 +217,6 @@ public class ProcessScheduler {
         return computeStats("Priority (non-preemptive)", results, totalTime);
     }
 
-    // ── Aging (prevent starvation) ────────────────────────────────────────────
-
-    /**
-     * Priority with aging: gradually increase priority of waiting processes.
-     * Prevents indefinite starvation of low-priority processes.
-     * Each unit of time waiting increases priority (decreases priority number) by 1.
-     */
     public static SchedulerStats priorityWithAging(List<Process> processes, int agingRate) {
         Map<Integer, Integer> effectivePriority = new HashMap<>();
         processes.forEach(p -> effectivePriority.put(p.id(), p.priority()));
@@ -279,7 +228,6 @@ public class ProcessScheduler {
         while (!remaining.isEmpty()) {
             int finalTime = time;
 
-            // Apply aging: reduce priority number for waiting processes
             remaining.forEach(p -> {
                 if (p.arrivalTime() <= finalTime) {
                     effectivePriority.merge(p.id(), -agingRate, Integer::sum);
@@ -312,8 +260,6 @@ public class ProcessScheduler {
         return computeStats("Priority + Aging", results, totalTime);
     }
 
-    // ── Stats computation ─────────────────────────────────────────────────────
-
     private static SchedulerStats computeStats(String name, List<ScheduleResult> results, int totalTime) {
         double avgWait      = results.stream().mapToInt(ScheduleResult::waitingTime).average().orElse(0);
         double avgTurnaround = results.stream().mapToInt(ScheduleResult::turnaroundTime).average().orElse(0);
@@ -322,8 +268,6 @@ public class ProcessScheduler {
         double throughput   = totalTime > 0 ? (double) results.size() / totalTime : 0;
         return new SchedulerStats(name, results, avgWait, avgTurnaround, cpuUtil, throughput);
     }
-
-    // ── Gantt chart renderer ──────────────────────────────────────────────────
 
     public static String ganttChart(SchedulerStats stats) {
         StringBuilder sb = new StringBuilder();

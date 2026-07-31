@@ -2,54 +2,24 @@ package com.conceptualware.core.os;
 
 import java.util.*;
 
-/**
- * Concept #17 — Memory Management (Gerenciamento de Memória):
- *
- *   Paging: physical memory divided into fixed-size frames, logical memory into pages.
- *     - Page table: maps virtual page number → physical frame number.
- *     - Address translation: virtual_address = (page_number * page_size) + offset.
- *     - TLB (Translation Lookaside Buffer): cache for page table entries.
- *     - Page fault: page not in memory → OS loads it from disk (demand paging).
- *
- *   Page Replacement Algorithms:
- *     - FIFO: evict the oldest loaded page (can have Belady's anomaly).
- *     - LRU: evict least recently used (optimal approximation, used by Linux).
- *     - Optimal (OPT): evict page used farthest in future (theoretical benchmark).
- *     - Clock (Second Chance): FIFO with reference bit (approximates LRU, cheaper).
- *
- *   Segmentation: logical memory divided into variable-size segments (code, stack, heap).
- *     - Each segment has base + limit; unlike paging, preserves logical structure.
- *     - Can be combined with paging (Intel x86 segmentation + paging).
- *
- *   Memory Allocation:
- *     - First Fit, Best Fit, Worst Fit strategies for dynamic allocation.
- *     - Buddy System: splits/merges blocks in powers of 2 (used by Linux kernel).
- *
- * Concept #17 — OS concepts, virtual memory, address spaces
- */
 public class MemorySimulator {
-
-    // ── Paging ────────────────────────────────────────────────────────────────
 
     public static class PageTable {
         private final int pageSize;
-        private final Map<Integer, Integer> entries = new LinkedHashMap<>(); // page → frame
+        private final Map<Integer, Integer> entries = new LinkedHashMap<>();
         private final Set<Integer> presentBits      = new HashSet<>();
         private int frameCount = 0;
         private long pageFaults = 0, tlbHits = 0, tlbMisses = 0;
         private final Map<Integer, Integer> tlb = new LinkedHashMap<>(16, 0.75f, true) {
-            // LRU TLB with max 16 entries
             protected boolean removeEldestEntry(Map.Entry<Integer, Integer> e) { return size() > 16; }
         };
 
         public PageTable(int pageSize) { this.pageSize = pageSize; }
 
-        /** Translate virtual address to physical address. */
         public int translate(int virtualAddress) {
             int pageNum = virtualAddress / pageSize;
             int offset  = virtualAddress % pageSize;
 
-            // TLB lookup
             Integer frame = tlb.get(pageNum);
             if (frame != null) {
                 tlbHits++;
@@ -58,7 +28,6 @@ public class MemorySimulator {
 
             tlbMisses++;
 
-            // Page table lookup
             if (!presentBits.contains(pageNum)) {
                 pageFaults++;
                 loadPage(pageNum);
@@ -83,9 +52,6 @@ public class MemorySimulator {
         }
     }
 
-    // ── Page Replacement Algorithms ───────────────────────────────────────────
-
-    /** Simulate a page replacement algorithm and return number of page faults. */
     public static int fifoPageFaults(int[] pages, int frames) {
         Set<Integer> inMemory = new LinkedHashSet<>();
         Queue<Integer> queue  = new LinkedList<>();
@@ -106,7 +72,6 @@ public class MemorySimulator {
     }
 
     public static int lruPageFaults(int[] pages, int frames) {
-        // LinkedHashMap with access order = true → LRU ordering
         LinkedHashMap<Integer, Boolean> lruCache = new LinkedHashMap<>(16, 0.75f, true) {
             protected boolean removeEldestEntry(Map.Entry<Integer, Boolean> e) {
                 return size() > frames;
@@ -117,20 +82,16 @@ public class MemorySimulator {
         for (int page : pages) {
             int sizeBefore = lruCache.size();
             lruCache.put(page, true);
-            // Page fault if it wasn't present OR was evicted (size didn't increase past frames)
             if (sizeBefore < frames || !lruCache.containsKey(page)) {
-                // Actually just check hits:
             }
         }
 
-        // Cleaner LRU simulation:
         Set<Integer> inMemory = new LinkedHashSet<>();
         Deque<Integer> lruOrder = new ArrayDeque<>();
         faults = 0;
 
         for (int page : pages) {
             if (inMemory.contains(page)) {
-                // Move to most recently used
                 lruOrder.remove(page);
                 lruOrder.addLast(page);
             } else {
@@ -146,7 +107,6 @@ public class MemorySimulator {
         return faults;
     }
 
-    /** Optimal (OPT) page replacement — theoretical minimum page faults. */
     public static int optimalPageFaults(int[] pages, int frames) {
         Set<Integer> inMemory = new HashSet<>();
         int faults = 0;
@@ -155,10 +115,9 @@ public class MemorySimulator {
             if (!inMemory.contains(pages[i])) {
                 faults++;
                 if (inMemory.size() == frames) {
-                    // Evict page used farthest in the future (or not used at all)
                     int evict = -1, farthest = i;
                     for (int page : inMemory) {
-                        int nextUse = pages.length; // assume never used again
+                        int nextUse = pages.length;
                         for (int j = i + 1; j < pages.length; j++) {
                             if (pages[j] == page) { nextUse = j; break; }
                         }
@@ -175,7 +134,6 @@ public class MemorySimulator {
         return faults;
     }
 
-    /** Clock algorithm (Second Chance) — O(1) per access, approximates LRU. */
     public static int clockPageFaults(int[] pages, int frames) {
         int[]     frameArr = new int[frames];
         boolean[] refBit   = new boolean[frames];
@@ -200,8 +158,6 @@ public class MemorySimulator {
         }
         return faults;
     }
-
-    // ── Segmentation ─────────────────────────────────────────────────────────
 
     public record Segment(String name, long base, long limit) {
         public boolean contains(long offset) { return offset >= 0 && offset < limit; }
@@ -233,19 +189,16 @@ public class MemorySimulator {
         public Map<String, Segment> getSegments() { return Collections.unmodifiableMap(segments); }
     }
 
-    /** Create a typical process memory layout (Linux-like). */
     public static SegmentTable typicalProcessLayout() {
         SegmentTable st = new SegmentTable();
-        st.addSegment("text",    0x400000L, 0x10000L);  // .text: code segment (read+execute)
-        st.addSegment("data",    0x600000L, 0x1000L);   // .data: initialized globals (read+write)
-        st.addSegment("bss",     0x601000L, 0x1000L);   // .bss: uninitialized globals (zero-filled)
-        st.addSegment("heap",    0x602000L, 0x100000L); // heap: grows upward (malloc)
-        st.addSegment("stack",   0x7fff0000L, 0x10000L);// stack: grows downward
-        st.addSegment("mmap",    0x7f000000L, 0x100000L);// mmap: shared libs, anonymous mappings
+        st.addSegment("text",    0x400000L, 0x10000L);
+        st.addSegment("data",    0x600000L, 0x1000L);
+        st.addSegment("bss",     0x601000L, 0x1000L);
+        st.addSegment("heap",    0x602000L, 0x100000L);
+        st.addSegment("stack",   0x7fff0000L, 0x10000L);
+        st.addSegment("mmap",    0x7f000000L, 0x100000L);
         return st;
     }
-
-    // ── Memory Allocation Strategies ─────────────────────────────────────────
 
     public record MemoryBlock(int start, int size, boolean free) {
         public MemoryBlock allocate() { return new MemoryBlock(start, size, false); }
@@ -259,7 +212,6 @@ public class MemorySimulator {
             blocks.add(new MemoryBlock(0, totalSize, true));
         }
 
-        /** First Fit: allocate in first block large enough. O(n) scan. */
         public Optional<Integer> firstFit(int requestedSize) {
             for (int i = 0; i < blocks.size(); i++) {
                 MemoryBlock b = blocks.get(i);
@@ -270,7 +222,6 @@ public class MemorySimulator {
             return Optional.empty();
         }
 
-        /** Best Fit: allocate in smallest free block that fits. Minimizes waste. */
         public Optional<Integer> bestFit(int requestedSize) {
             int bestIdx = -1, bestSize = Integer.MAX_VALUE;
             for (int i = 0; i < blocks.size(); i++) {
@@ -283,7 +234,6 @@ public class MemorySimulator {
             return Optional.of(split(bestIdx, requestedSize));
         }
 
-        /** Worst Fit: allocate in largest free block. Maximizes remaining fragment size. */
         public Optional<Integer> worstFit(int requestedSize) {
             int worstIdx = -1, worstSize = -1;
             for (int i = 0; i < blocks.size(); i++) {
@@ -300,7 +250,6 @@ public class MemorySimulator {
             MemoryBlock b = blocks.get(idx);
             int start = b.start();
             if (b.size() > size) {
-                // Split: allocated block + free remainder
                 blocks.set(idx, new MemoryBlock(start, size, false));
                 blocks.add(idx + 1, new MemoryBlock(start + size, b.size() - size, true));
             } else {
@@ -313,7 +262,7 @@ public class MemorySimulator {
             for (int i = 0; i < blocks.size(); i++) {
                 if (blocks.get(i).start() == address) {
                     blocks.set(i, new MemoryBlock(blocks.get(i).start(), blocks.get(i).size(), true));
-                    coalesce(); // merge adjacent free blocks
+                    coalesce();
                     return;
                 }
             }

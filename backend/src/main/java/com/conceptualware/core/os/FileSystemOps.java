@@ -6,33 +6,7 @@ import java.nio.file.attribute.*;
 import java.util.*;
 import java.util.stream.*;
 
-/**
- * Concept #17 — File System Operations (Sistema de Arquivos):
- *
- *   Inodes: Unix/Linux data structure storing file metadata.
- *     Each file has one inode with: permissions, owner, timestamps, data block pointers.
- *     Directory entries map filenames → inode numbers (inodes don't store names).
- *     Java: BasicFileAttributes, PosixFileAttributes.
- *
- *   File permissions: Unix rwxrwxrwx (owner/group/other).
- *     Java NIO: PosixFilePermissions, Files.setPosixFilePermissions().
- *
- *   Directory tree traversal: Files.walk(), FileVisitor pattern.
- *
- *   Hard links vs Symbolic links:
- *     Hard link: additional directory entry pointing to same inode (same inode number).
- *     Symbolic link: file containing a path to another file (different inode).
- *
- *   Watch service: OS-level file system event notification (inotify on Linux, FSEvents on macOS).
- *
- *   Memory-mapped files: mmap() — file I/O via memory addresses.
- *     Java: FileChannel.map() → MappedByteBuffer.
- *
- * Concept #17 — OS, filesystem, POSIX API
- */
 public class FileSystemOps {
-
-    // ── Inode-equivalent metadata ─────────────────────────────────────────────
 
     public record InodeInfo(
         Path     path,
@@ -44,7 +18,7 @@ public class FileSystemOps {
         FileTime lastAccessed,
         String   owner,
         Set<PosixFilePermission> permissions,
-        Object   fileKey  // inode number equivalent on this OS
+        Object   fileKey
     ) {
         public String permissionsString() {
             return PosixFilePermissions.toString(permissions);
@@ -58,19 +32,16 @@ public class FileSystemOps {
         }
     }
 
-    /** Read inode-equivalent metadata from a file (Java NIO equivalent of stat()). */
     public static InodeInfo stat(Path path) throws IOException {
         BasicFileAttributes basic = Files.readAttributes(path, BasicFileAttributes.class);
         String owner = "unknown";
         Set<PosixFilePermission> perms = new HashSet<>();
 
-        // POSIX attributes only available on Unix/Linux/macOS
         try {
             PosixFileAttributes posix = Files.readAttributes(path, PosixFileAttributes.class);
             owner = posix.owner().getName();
             perms = posix.permissions();
         } catch (UnsupportedOperationException ignored) {
-            // Windows — no POSIX attributes
             perms = new HashSet<>();
         }
 
@@ -81,9 +52,6 @@ public class FileSystemOps {
         );
     }
 
-    // ── File permissions ──────────────────────────────────────────────────────
-
-    /** Set permissions using Unix octal notation (e.g., 0755 → rwxr-xr-x). */
     public static void setPermissions(Path path, String posixPerms) throws IOException {
         Set<PosixFilePermission> perms = PosixFilePermissions.fromString(posixPerms);
         Files.setPosixFilePermissions(path, perms);
@@ -103,26 +71,12 @@ public class FileSystemOps {
         return perms;
     }
 
-    // ── Directory traversal ───────────────────────────────────────────────────
-
-    /** Recursive directory walk (like `find .`). */
     public static List<Path> walkDirectory(Path root, int maxDepth) throws IOException {
         try (Stream<Path> stream = Files.walk(root, maxDepth)) {
             return stream.collect(Collectors.toList());
         }
     }
 
-    // ── Path Traversal Protection — Concept #21 (OWASP A01: Broken Access Control) ──
-
-    /**
-     * Resolve um caminho fornecido pelo usuário (ex.: nome de arquivo de upload)
-     * contra um diretório base, rejeitando qualquer tentativa de escapar dele
-     * via ".." ou links simbólicos ("Zip Slip" / path traversal, OWASP A01).
-     *
-     * Estratégia: resolve o caminho relativo contra a base, normaliza (colapsa
-     * "..") e então verifica que o resultado ainda começa pela base — path
-     * traversal clássico tenta justamente burlar essa checagem sem normalização.
-     */
     public static Path safeResolveFile(Path baseDir, String userSuppliedRelativePath) {
         Path base = baseDir.toAbsolutePath().normalize();
         Path resolved = base.resolve(userSuppliedRelativePath).normalize();
@@ -134,7 +88,6 @@ public class FileSystemOps {
         return resolved;
     }
 
-    /** FileVisitor pattern — full control over traversal (preVisit, postVisit, error). */
     public static Map<String, Long> sizeByExtension(Path root) throws IOException {
         Map<String, Long> sizes = new TreeMap<>();
         Files.walkFileTree(root, new SimpleFileVisitor<>() {
@@ -147,7 +100,7 @@ public class FileSystemOps {
 
             @Override
             public FileVisitResult visitFileFailed(Path file, IOException exc) {
-                return FileVisitResult.CONTINUE; // skip unreadable files
+                return FileVisitResult.CONTINUE;
             }
         });
         return sizes;
@@ -157,8 +110,6 @@ public class FileSystemOps {
         int dot = filename.lastIndexOf('.');
         return dot > 0 ? filename.substring(dot + 1).toLowerCase() : "(no ext)";
     }
-
-    // ── Links ─────────────────────────────────────────────────────────────────
 
     public static void createSymlink(Path link, Path target) throws IOException {
         Files.createSymbolicLink(link, target);
@@ -174,12 +125,6 @@ public class FileSystemOps {
         return keyA != null && keyA.equals(keyB);
     }
 
-    // ── Atomic file operations ────────────────────────────────────────────────
-
-    /**
-     * Atomic write: write to temp file then rename.
-     * On Linux/POSIX, rename() is atomic — readers see either old or new content, never partial.
-     */
     public static void atomicWrite(Path target, byte[] content) throws IOException {
         Path temp = target.resolveSibling(target.getFileName() + ".tmp." + System.nanoTime());
         try {
@@ -191,9 +136,6 @@ public class FileSystemOps {
         }
     }
 
-    // ── Memory-mapped file I/O ────────────────────────────────────────────────
-
-    /** Memory-map a file for zero-copy I/O — efficient for large files. */
     public static byte[] readMemoryMapped(Path path) throws IOException {
         try (var channel = java.nio.channels.FileChannel.open(path, StandardOpenOption.READ)) {
             long size = channel.size();
@@ -207,23 +149,14 @@ public class FileSystemOps {
         }
     }
 
-    // ── File locking ──────────────────────────────────────────────────────────
-
-    /**
-     * Exclusive file lock (advisory on most Unix systems — equivalent of flock()).
-     * Prevents concurrent writes from multiple processes.
-     */
     public static void withExclusiveLock(Path path, Runnable action) throws IOException {
         try (var channel = java.nio.channels.FileChannel.open(path,
                  StandardOpenOption.CREATE, StandardOpenOption.WRITE);
-             var lock = channel.lock()) { // blocks until lock acquired
+             var lock = channel.lock()) {
             action.run();
         }
     }
 
-    // ── /proc virtual filesystem concepts (read-only on Linux) ───────────────
-
-    /** Read /proc/self/status to get process memory info (Linux only). */
     public static Map<String, String> readProcStatus() {
         Map<String, String> info = new LinkedHashMap<>();
         try {
@@ -232,22 +165,20 @@ public class FileSystemOps {
                 if (parts.length == 2) info.put(parts[0].trim(), parts[1].trim());
             });
         } catch (IOException ignored) {
-            // Not on Linux or /proc not available
             info.put("VmRSS", "N/A (not Linux)");
             info.put("VmSize", "N/A (not Linux)");
         }
         return info;
     }
 
-    /** Inode simulation: tracks files and their block allocations. */
     public record SimulatedInode(
         int    inodeNumber,
         String name,
         long   size,
         int    linkCount,
-        int[]  directBlocks,   // first 12 data blocks
-        int    singleIndirect, // points to block containing block addresses
-        int    doubleIndirect  // two levels of indirection for very large files
+        int[]  directBlocks,
+        int    singleIndirect,
+        int    doubleIndirect
     ) {
         public static SimulatedInode create(int num, String name, long sizeBytes) {
             int blockSize = 4096;
