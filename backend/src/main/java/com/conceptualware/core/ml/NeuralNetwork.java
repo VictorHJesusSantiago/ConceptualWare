@@ -2,43 +2,7 @@ package com.conceptualware.core.ml;
 
 import java.util.*;
 
-/**
- * Concept #30 — Neural Networks & Deep Learning:
- *
- *   MULTI-LAYER PERCEPTRON (MLP) — fully connected feedforward network.
- *
- *   Architecture:  Input → [Hidden₁ → Hidden₂ → ... → Hiddenₙ] → Output
- *   Each layer:    z = Wᵀx + b    (linear transform)
- *                  a = f(z)        (activation function)
- *
- *   ACTIVATION FUNCTIONS:
- *     ReLU:    f(z) = max(0, z)           f'(z) = 1 if z>0, else 0
- *     Sigmoid: f(z) = 1/(1+e⁻ᶻ)          f'(z) = f(z)(1-f(z))
- *     Tanh:    f(z) = (eᶻ-e⁻ᶻ)/(eᶻ+e⁻ᶻ)  f'(z) = 1 - f(z)²
- *     Softmax: fᵢ = e^zᵢ / Σe^zⱼ         (multi-class output)
- *     LeakyReLU: f(z) = max(0.01z, z)    avoids dying ReLU
- *     GELU:    f(z) ≈ z·Φ(z)             used in BERT/GPT
- *
- *   BACKPROPAGATION (reverse-mode auto-differentiation):
- *     Forward pass:  compute z, a layer by layer
- *     Output delta:  δ_L = (aL - y) ⊙ f'(z_L)    (MSE loss)
- *     Hidden delta:  δₗ = (Wₗ₊₁ᵀ δₗ₊₁) ⊙ f'(zₗ)   (chain rule)
- *     Weight grad:   ∂L/∂Wₗ = δₗ aₗ₋₁ᵀ
- *     Bias grad:     ∂L/∂bₗ = δₗ
- *
- *   OPTIMIZERS:
- *     SGD:     w := w - α·g
- *     Momentum: v := βv + g;  w := w - α·v
- *     Adam:    m := β₁m + (1-β₁)g;  v := β₂v + (1-β₂)g²;  w := w - α·m̂/√(v̂+ε)
- *
- *   REGULARIZATION:
- *     Dropout: randomly zero-out neurons during training (reduces co-adaptation)
- *     BatchNorm: normalize layer inputs (stabilizes training, allows higher lr)
- *     L2 weight decay: add λ||w||² to loss
- */
 public class NeuralNetwork {
-
-    // ── Activation Functions ──────────────────────────────────────────────────
 
     public enum Activation {
         RELU, SIGMOID, TANH, LEAKY_RELU, LINEAR;
@@ -70,26 +34,22 @@ public class NeuralNetwork {
         }
     }
 
-    // ── Layer ─────────────────────────────────────────────────────────────────
-
     private static class Layer {
-        double[][] W;   // weights [outputSize × inputSize]
-        double[]   b;   // biases  [outputSize]
-        double[]   z;   // pre-activation
-        double[]   a;   // post-activation
-        double[]   delta; // error signal (backprop)
+        double[][] W;
+        double[]   b;
+        double[]   z;
+        double[]   a;
+        double[]   delta;
         final Activation activation;
 
-        // Adam optimizer state
-        double[][] mW, vW; // first/second moment for weights
-        double[]   mb, vb; // first/second moment for biases
+        double[][] mW, vW;
+        double[]   mb, vb;
         int adamT = 0;
 
         Layer(int inputSize, int outputSize, Activation activation, Random rng) {
             this.activation = activation;
             W = new double[outputSize][inputSize];
             b = new double[outputSize];
-            // He initialization for ReLU, Xavier for sigmoid/tanh
             double scale = activation == Activation.RELU ? Math.sqrt(2.0 / inputSize) : Math.sqrt(1.0 / inputSize);
             for (int i = 0; i < outputSize; i++)
                 for (int j = 0; j < inputSize; j++) W[i][j] = rng.nextGaussian() * scale;
@@ -109,8 +69,6 @@ public class NeuralNetwork {
         }
     }
 
-    // ── MLP Network ───────────────────────────────────────────────────────────
-
     private final List<Layer> layers = new ArrayList<>();
     private final double learningRate;
     private final double beta1 = 0.9, beta2 = 0.999, epsilon = 1e-8;
@@ -122,40 +80,23 @@ public class NeuralNetwork {
             layers.add(new Layer(sizes[i-1], sizes[i], activations[i-1], rng));
     }
 
-    // ── Forward Pass ─────────────────────────────────────────────────────────
-
     public double[] forward(double[] input) {
         double[] current = input;
         for (var layer : layers) current = layer.forward(current);
         return current;
     }
 
-    /** Softmax for multi-class output. */
     public double[] softmax(double[] z) {
-        double max = Arrays.stream(z).max().orElse(0); // numerical stability
+        double max = Arrays.stream(z).max().orElse(0);
         double[] exp = Arrays.stream(z).map(v -> Math.exp(v - max)).toArray();
         double sum = Arrays.stream(exp).sum();
         for (int i = 0; i < exp.length; i++) exp[i] /= sum;
         return exp;
     }
 
-    // ── Backpropagation ───────────────────────────────────────────────────────
-
-    /**
-     * Backpropagation via chain rule.
-     *
-     * Given:
-     *   loss = MSE or BCE
-     *   output = forward(x)
-     *
-     * Compute gradient of loss w.r.t. every weight and bias,
-     * then update using Adam optimizer.
-     */
     public double trainStep(double[] input, double[] target) {
-        // Forward pass
         double[] output = forward(input);
 
-        // Compute output delta (MSE gradient: dL/da = a - y)
         Layer outLayer = layers.get(layers.size() - 1);
         outLayer.delta = new double[output.length];
         double loss = 0;
@@ -166,7 +107,6 @@ public class NeuralNetwork {
         }
         loss /= output.length;
 
-        // Backpropagate through hidden layers
         for (int l = layers.size() - 2; l >= 0; l--) {
             Layer curr = layers.get(l);
             Layer next = layers.get(l + 1);
@@ -177,7 +117,6 @@ public class NeuralNetwork {
             }
         }
 
-        // Update weights using Adam
         double[] prevA = input;
         for (var layer : layers) {
             layer.adamT++;
@@ -204,7 +143,6 @@ public class NeuralNetwork {
         Random rng = new Random(42);
         for (int e = 0; e < epochs; e++) {
             double totalLoss = 0;
-            // SGD with shuffle
             Integer[] indices = new Integer[X.length];
             for (int i = 0; i < X.length; i++) indices[i] = i;
             Arrays.sort(indices, (a, b) -> rng.nextInt(3) - 1);
@@ -214,26 +152,12 @@ public class NeuralNetwork {
         return lossHistory;
     }
 
-    // ── CNN BUILDING BLOCKS ───────────────────────────────────────────────────
-    /**
-     * Concept #30 — Convolutional Neural Networks (CNN):
-     *
-     *   CNNs exploit spatial locality by applying learned filters (kernels).
-     *   Key layers:
-     *     Convolution:  output[i,j] = Σ kernel[m,n] * input[i+m, j+n]
-     *     Max Pooling:  output[i,j] = max(input[2i..2i+s, 2j..2j+s])  (stride s)
-     *     Flatten:      reshape 2D feature map to 1D vector
-     *
-     *   Parameter sharing: same kernel applied everywhere → fewer params than FC.
-     *   Translation invariance: max pooling ignores exact position of features.
-     */
     public static class Conv2D {
-        private final double[][] kernel; // [kH × kW]
+        private final double[][] kernel;
         private final double bias;
 
         public Conv2D(double[][] kernel, double bias) { this.kernel = kernel; this.bias = bias; }
 
-        /** 2D cross-correlation (conv without kernel flip). Padding: 'valid' (no padding). */
         public double[][] forward(double[][] input) {
             int inH = input.length, inW = input[0].length;
             int kH = kernel.length, kW = kernel[0].length;
@@ -244,12 +168,11 @@ public class NeuralNetwork {
                 for (int j = 0; j < outW; j++) {
                     double sum = bias;
                     for (int m = 0; m < kH; m++) for (int n = 0; n < kW; n++) sum += kernel[m][n] * input[i+m][j+n];
-                    output[i][j] = Math.max(0, sum); // ReLU activation inline
+                    output[i][j] = Math.max(0, sum);
                 }
             return output;
         }
 
-        /** Max pooling with given stride and pool size. */
         public static double[][] maxPool(double[][] input, int poolSize, int stride) {
             int outH = (input.length - poolSize) / stride + 1;
             int outW = (input[0].length - poolSize) / stride + 1;
@@ -264,7 +187,6 @@ public class NeuralNetwork {
             return output;
         }
 
-        /** Flatten 2D feature map to 1D. */
         public static double[] flatten(double[][] featureMap) {
             int h = featureMap.length, w = featureMap[0].length;
             double[] flat = new double[h * w];
@@ -273,29 +195,7 @@ public class NeuralNetwork {
         }
     }
 
-    // ── RNN / LSTM / GRU ─────────────────────────────────────────────────────
-    /**
-     * Concept #30 — Recurrent Neural Networks:
-     *
-     *   RNN:  hₜ = tanh(Wₓxₜ + Wₕhₜ₋₁ + b)
-     *     Problem: vanishing/exploding gradient over long sequences.
-     *
-     *   LSTM (Long Short-Term Memory) — solves vanishing gradient via gates:
-     *     Forget gate: fₜ = σ(Wf[hₜ₋₁,xₜ] + bf)        — what to forget from cell
-     *     Input gate:  iₜ = σ(Wi[hₜ₋₁,xₜ] + bi)        — what new info to store
-     *     Candidate:   c̃ₜ = tanh(Wc[hₜ₋₁,xₜ] + bc)
-     *     Cell update: cₜ = fₜ⊙cₜ₋₁ + iₜ⊙c̃ₜ
-     *     Output gate: oₜ = σ(Wo[hₜ₋₁,xₜ] + bo)
-     *     Hidden:      hₜ = oₜ⊙tanh(cₜ)
-     *
-     *   GRU (Gated Recurrent Unit) — simpler, fewer parameters:
-     *     Reset gate:  rₜ = σ(Wr[hₜ₋₁,xₜ])
-     *     Update gate: zₜ = σ(Wz[hₜ₋₁,xₜ])
-     *     Candidate:   h̃ₜ = tanh(Wh[rₜ⊙hₜ₋₁,xₜ])
-     *     Hidden:      hₜ = (1-zₜ)⊙hₜ₋₁ + zₜ⊙h̃ₜ
-     */
     public static class LSTM {
-        // All weight matrices [hiddenSize × (hiddenSize + inputSize)]
         private final double[][] Wf, Wi, Wc, Wo;
         private final double[]   bf, bi, bc, bo;
         private final int hiddenSize;
@@ -311,7 +211,6 @@ public class NeuralNetwork {
             Wo = randomMatrix(hiddenSize, sz); bo = new double[hiddenSize];
         }
 
-        /** Run one LSTM step. Returns [h, c] pair. */
         public double[][] step(double[] x, double[] h, double[] c) {
             double[] concat = concat(h, x);
             double[] ft = sigmoid(addBias(matVec(Wf, concat), bf));
@@ -328,7 +227,6 @@ public class NeuralNetwork {
             return new double[][]{new_h, new_c};
         }
 
-        /** Process a sequence of inputs, return final hidden state. */
         public double[] forward(double[][] sequence) {
             double[] h = new double[hiddenSize];
             double[] c = new double[hiddenSize];

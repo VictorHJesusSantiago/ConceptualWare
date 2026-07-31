@@ -2,46 +2,13 @@ package com.conceptualware.core.ml;
 
 import java.util.*;
 
-/**
- * Concept #30 — Supervised Machine Learning:
- *
- *   In supervised learning, the model learns a mapping f: X → Y from
- *   labeled training examples {(x₁,y₁), ..., (xₙ,yₙ)}.
- *
- *   REGRESSION algorithms (continuous Y):
- *     LinearRegression  — fits hyperplane via gradient descent or normal equation
- *     PolynomialRegression — feature expansion Xᵢ → [1, x, x², ..., xᵈ]
- *
- *   CLASSIFICATION algorithms (discrete Y):
- *     LogisticRegression — sigmoid function, binary cross-entropy loss
- *     KNN               — k-nearest neighbor majority vote
- *     NaiveBayes        — P(y|x) ∝ P(y) ∏ P(xᵢ|y) — conditional independence
- *     DecisionTree      — axis-aligned splits, Gini impurity or information gain
- *     RandomForest      — bagged ensemble of decision trees
- *     SupportVectorMachine — maximum-margin hyperplane with optional kernel
- *
- *   Loss functions:
- *     MSE  = (1/n) Σ (ŷ - y)²            (regression)
- *     MAE  = (1/n) Σ |ŷ - y|             (regression, robust to outliers)
- *     BCE  = -1/n Σ [y log ŷ + (1-y) log(1-ŷ)]  (binary classification)
- *     CE   = -Σ y_c log ŷ_c              (multi-class softmax)
- */
 public class SupervisedLearning {
 
-    // ── LINEAR REGRESSION ─────────────────────────────────────────────────────
-    /**
-     * Ordinary Least Squares (OLS) via gradient descent.
-     *   Loss:        L(w) = (1/2n) Σ (Xw - y)²
-     *   Gradient:    ∇L = (1/n) Xᵀ(Xw - y)
-     *   Update:      w := w - α·∇L
-     *
-     *   Normal equation (closed-form): w = (XᵀX)⁻¹ Xᵀy — O(p³), no iterations
-     */
     public static class LinearRegression {
-        private double[] weights;  // w[0]=bias, w[1..p]=feature weights
+        private double[] weights;
         private final double learningRate;
         private final int maxIter;
-        private final double l2Lambda; // L2 regularization (Ridge)
+        private final double l2Lambda;
 
         public LinearRegression(double learningRate, int maxIter, double l2Lambda) {
             this.learningRate = learningRate;
@@ -51,7 +18,7 @@ public class SupervisedLearning {
 
         public TrainingHistory fit(double[][] X, double[] y) {
             int n = X.length, p = X[0].length;
-            weights = new double[p + 1]; // +1 for bias
+            weights = new double[p + 1];
             double[] losses = new double[maxIter];
 
             for (int iter = 0; iter < maxIter; iter++) {
@@ -61,15 +28,14 @@ public class SupervisedLearning {
                     double pred = predict(X[i]);
                     double err  = pred - y[i];
                     loss += err * err;
-                    grad[0] += err; // bias gradient
+                    grad[0] += err;
                     for (int j = 0; j < p; j++) grad[j + 1] += err * X[i][j];
                 }
                 loss /= (2 * n);
                 losses[iter] = loss;
-                // Gradient descent update with L2 regularization
                 weights[0] -= learningRate * grad[0] / n;
                 for (int j = 1; j <= p; j++) {
-                    grad[j] = grad[j] / n + l2Lambda * weights[j]; // Ridge penalty
+                    grad[j] = grad[j] / n + l2Lambda * weights[j];
                     weights[j] -= learningRate * grad[j];
                 }
             }
@@ -77,7 +43,7 @@ public class SupervisedLearning {
         }
 
         public double predict(double[] x) {
-            double pred = weights[0]; // bias
+            double pred = weights[0];
             for (int j = 0; j < x.length; j++) pred += weights[j + 1] * x[j];
             return pred;
         }
@@ -102,14 +68,6 @@ public class SupervisedLearning {
         public double[] weights() { return weights.clone(); }
     }
 
-    // ── LOGISTIC REGRESSION ───────────────────────────────────────────────────
-    /**
-     * Binary classification using sigmoid function.
-     *   ŷ = σ(Xw) = 1 / (1 + e^(-Xw))
-     *   Loss:     BCE = -1/n Σ [y log ŷ + (1-y) log(1-ŷ)]
-     *   Gradient: ∇L = (1/n) Xᵀ(ŷ - y)
-     *   Decision: class 1 if ŷ ≥ threshold (default 0.5)
-     */
     public static class LogisticRegression {
         private double[] weights;
         private final double learningRate;
@@ -160,14 +118,6 @@ public class SupervisedLearning {
         }
     }
 
-    // ── K-NEAREST NEIGHBORS ───────────────────────────────────────────────────
-    /**
-     * Non-parametric, instance-based (lazy) learner.
-     * Prediction: find k nearest training points by Euclidean distance → majority vote.
-     * Time:  O(n·d) per query (brute-force); O(log n) with k-d tree.
-     * Space: O(n) — stores entire training set.
-     * Hyperparameter k: low k → high variance (overfitting), high k → high bias.
-     */
     public static class KNN {
         private double[][] trainX;
         private int[] trainY;
@@ -214,16 +164,10 @@ public class SupervisedLearning {
         }
     }
 
-    // ── NAIVE BAYES (GAUSSIAN) ────────────────────────────────────────────────
-    /**
-     * Bayes' theorem: P(y|x) ∝ P(y) ∏ P(xᵢ|y)
-     * Gaussian NB: P(xᵢ|y) = (1/√(2πσ²)) exp(-(xᵢ-μ)²/2σ²)
-     * Log-probability to avoid underflow: log P(y|x) = log P(y) + Σ log P(xᵢ|y)
-     */
     public static class GaussianNaiveBayes {
-        private double[] classPriors;    // log P(y=c)
-        private double[][] classMeans;   // μ[c][j]
-        private double[][] classVars;    // σ²[c][j]
+        private double[] classPriors;
+        private double[][] classMeans;
+        private double[][] classVars;
         private int numClasses;
 
         public void fit(double[][] X, int[] y) {
@@ -241,9 +185,8 @@ public class SupervisedLearning {
                 for (int j=0;j<p;j++) classMeans[c][j] /= counts[c];
             }
 
-            // Compute variance
             for (int i = 0; i < n; i++) for (int j=0;j<p;j++) classVars[y[i]][j] += Math.pow(X[i][j]-classMeans[y[i]][j],2);
-            for (int c=0;c<numClasses;c++) for (int j=0;j<p;j++) classVars[c][j] = classVars[c][j] / counts[c] + 1e-9; // Laplace smoothing
+            for (int c=0;c<numClasses;c++) for (int j=0;j<p;j++) classVars[c][j] = classVars[c][j] / counts[c] + 1e-9;
         }
 
         public int predict(double[] x) {
@@ -268,14 +211,6 @@ public class SupervisedLearning {
         }
     }
 
-    // ── DECISION TREE ─────────────────────────────────────────────────────────
-    /**
-     * CART (Classification and Regression Trees):
-     *   At each node, find the (feature, threshold) split that maximally reduces impurity.
-     *   Gini impurity: G = 1 - Σ pᵢ²  (classification)
-     *   Variance:      V = (1/n) Σ (yᵢ - ȳ)²  (regression)
-     *   Stopping: max_depth, min_samples_leaf
-     */
     public static class DecisionTree {
         private Node root;
         private final int maxDepth;
@@ -297,7 +232,7 @@ public class SupervisedLearning {
             }
             double bestGain = -1; int bestFeat = -1; double bestThresh = 0;
             for (int j = 0; j < X[0].length; j++) {
-                final int feature = j; // captura effectively-final para o lambda abaixo
+                final int feature = j;
                 double[] vals = Arrays.stream(X).mapToDouble(row -> row[feature]).toArray();
                 Arrays.sort(vals);
                 for (int t = 0; t < vals.length - 1; t++) {
@@ -359,17 +294,6 @@ public class SupervisedLearning {
         }
     }
 
-    // ── RANDOM FOREST ─────────────────────────────────────────────────────────
-    /**
-     * Ensemble of DecisionTrees trained on bootstrap samples (bagging).
-     *   Bootstrap: sample n examples with replacement from training set
-     *   Feature subsampling: at each split, consider only √p features
-     *   Prediction: majority vote across all trees
-     *
-     *   Reduces overfitting vs single tree by:
-     *     - Bagging (bootstrap aggregating): reduces variance
-     *     - Feature randomness: decorrelates trees
-     */
     public static class RandomForest {
         private final List<DecisionTree> trees = new ArrayList<>();
         private final int numTrees;
@@ -386,7 +310,6 @@ public class SupervisedLearning {
         public void fit(double[][] X, int[] y) {
             int n = X.length;
             for (int t = 0; t < numTrees; t++) {
-                // Bootstrap sample
                 int[] indices = new int[n];
                 for (int i = 0; i < n; i++) indices[i] = rng.nextInt(n);
                 double[][] bootX = new double[n][];
@@ -411,8 +334,6 @@ public class SupervisedLearning {
             return (double) correct / X.length;
         }
     }
-
-    // ── Shared Types ──────────────────────────────────────────────────────────
 
     public record TrainingHistory(double[] losses, double[] finalWeights) {
         public double finalLoss() { return losses[losses.length - 1]; }
