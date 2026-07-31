@@ -10,22 +10,10 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 import java.util.*;
 
-/**
- * Concept #7  — OOP: Classe, Atributos, Métodos, Herança (AggregateRoot),
- *   Encapsulamento (private setters), Enum, Record, Modificadores de acesso
- * Concept #12 — DDD: Entidade, Agregado, Objeto de Valor (Email, Username),
- *   Bounded Context (user domain)
- * Concept #14 — SOLID: SRP (User only manages user invariants),
- *   OCP (extensible via events), LSP, ISP, DIP
- * Concept #11 — MongoDB @Document mapping
- * Concept #21 — Segurança: Armazenamento seguro de senha (hash), Role-based access
- */
 @Document(collection = "users")
 @Getter
 @NoArgsConstructor
 public class User extends AggregateRoot {
-
-    // ── Value Objects ─────────────────────────────────────────────────────────
 
     public record Email(String value) {
         public Email {
@@ -45,19 +33,11 @@ public class User extends AggregateRoot {
         }
     }
 
-    // ── User Roles (RBAC — Concept #21) ──────────────────────────────────────
-
     public enum Role { USER, PREMIUM, ADMIN }
-
-    // ── User Status ────────────────────────────────────────────────────────────
 
     public enum Status { ACTIVE, SUSPENDED, PENDING_VERIFICATION, DELETED }
 
-    // ── Skill Level (domain concept) ──────────────────────────────────────────
-
     public enum SkillLevel { BEGINNER, INTERMEDIATE, ADVANCED, EXPERT }
-
-    // ── Fields ────────────────────────────────────────────────────────────────
 
     @Indexed(unique = true)
     private String email;
@@ -65,7 +45,7 @@ public class User extends AggregateRoot {
     @Indexed(unique = true)
     private String username;
 
-    private String passwordHash;  // BCrypt — Concept #21
+    private String passwordHash;
 
     private Set<Role> roles = new HashSet<>(Set.of(Role.USER));
     private Status status = Status.PENDING_VERIFICATION;
@@ -79,29 +59,17 @@ public class User extends AggregateRoot {
     private Instant lastActiveAt;
     private Instant emailVerifiedAt;
 
-    // Refresh tokens (Concept #21 — Token management)
-    // LinkedHashMap preserva ordem de INSERÇÃO — necessário para evict corretamente
-    // a sessão mais antiga (ver storeRefreshToken). Um HashMap comum não garante
-    // nenhuma ordem, e usar o valor (expiração = now+7dias) como proxy de "mais
-    // antigo" não funciona: todas as expirações são calculadas a poucos
-    // microssegundos de distância dentro de um mesmo loop de inserção.
     private final Map<String, Instant> refreshTokens = new LinkedHashMap<>();
 
-    // ── Lockout por força bruta (Concept #21 — Brute Force Protection) ──────────
-    // Bloqueia a conta por LOCKOUT_DURATION após MAX_FAILED_ATTEMPTS consecutivos.
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final java.time.Duration LOCKOUT_DURATION = java.time.Duration.ofMinutes(15);
 
     private int failedLoginAttempts = 0;
     private Instant lockedUntil;
 
-    // Progress tracking — Set of completed concept IDs
     private final Set<String> completedConcepts = new HashSet<>();
 
-    // Favorite algorithms
     private final Set<String> favorites = new HashSet<>();
-
-    // ── Factory Method ────────────────────────────────────────────────────────
 
     public static User create(String email, String username, String passwordHash) {
         User user = new User();
@@ -112,8 +80,6 @@ public class User extends AggregateRoot {
         user.registerEvent(new UserRegisteredEvent(user.email, user.username));
         return user;
     }
-
-    // ── Business Methods ──────────────────────────────────────────────────────
 
     public void verifyEmail() {
         if (status != Status.PENDING_VERIFICATION)
@@ -146,16 +112,11 @@ public class User extends AggregateRoot {
     public void removeFromFavorites(String algorithmId) { this.favorites.remove(algorithmId); }
 
     public void storeRefreshToken(String token) {
-        // Limit to 5 concurrent sessions — Concept #21 (session management).
-        // Evict pela ORDEM DE INSERÇÃO (LinkedHashMap), não pelo valor de
-        // expiração — todas as expirações são "now + 7 dias" calculadas quase
-        // simultaneamente, então comparar por valor não identifica de forma
-        // confiável qual token foi inserido primeiro.
         if (refreshTokens.size() >= 5) {
             String oldest = refreshTokens.keySet().stream().findFirst().orElse(null);
             if (oldest != null) refreshTokens.remove(oldest);
         }
-        refreshTokens.put(token, Instant.now().plusSeconds(604800)); // 7 days
+        refreshTokens.put(token, Instant.now().plusSeconds(604800));
     }
 
     public boolean isRefreshTokenValid(String token) {
@@ -167,14 +128,10 @@ public class User extends AggregateRoot {
 
     public void recordActivity() { this.lastActiveAt = Instant.now(); }
 
-    // ── Brute Force Protection ────────────────────────────────────────────────
-
-    /** Retorna true se a conta está bloqueada no momento. */
     public boolean isLockedOut() {
         return lockedUntil != null && Instant.now().isBefore(lockedUntil);
     }
 
-    /** Registra uma tentativa de login inválida e aplica lockout se necessário. */
     public void recordFailedLogin() {
         this.failedLoginAttempts++;
         if (this.failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
@@ -182,13 +139,11 @@ public class User extends AggregateRoot {
         }
     }
 
-    /** Reseta o contador após login bem-sucedido. */
     public void resetFailedLogins() {
         this.failedLoginAttempts = 0;
         this.lockedUntil = null;
     }
 
-    /** Tempo restante de lockout (zero se não bloqueado). */
     public java.time.Duration lockoutRemaining() {
         if (!isLockedOut()) return java.time.Duration.ZERO;
         return java.time.Duration.between(Instant.now(), lockedUntil);
@@ -202,22 +157,11 @@ public class User extends AggregateRoot {
     public boolean isActive() { return status == Status.ACTIVE; }
     public boolean hasRole(Role role) { return roles.contains(role); }
 
-    // ── Getters seguros para coleções mutáveis ────────────────────────────────
-    // O @Getter do Lombok no nível da classe expõe as referências internas.
-    // Esses métodos sobrescrevem o comportamento para retornar cópias somente-leitura.
-
-    /** Papéis do usuário — imutável para o chamador. */
     public Set<Role> getRoles() { return Collections.unmodifiableSet(roles); }
 
-    /** Conceitos concluídos — imutável. */
     public Set<String> getCompletedConcepts() { return Collections.unmodifiableSet(completedConcepts); }
 
-    /** Favoritos — imutável. */
     public Set<String> getFavorites() { return Collections.unmodifiableSet(favorites); }
-
-    // refreshTokens NÃO é exposto: contém segredos. Acesso somente via métodos de domínio.
-
-    // ── Knowledge Progress (Concept #30 — recommendations) ────────────────────
 
     public double progressPercentage(int totalConcepts) {
         if (totalConcepts <= 0) return 0;
@@ -225,17 +169,11 @@ public class User extends AggregateRoot {
     }
 
     private void updateSkillLevel() {
-        // NOTE: primitive type patterns in `switch` are not available in Java 21
-        // (records/sealed patterns are, but `case int p when ...` is not), so use guards.
         if (totalPoints >= 10000)     this.skillLevel = SkillLevel.EXPERT;
         else if (totalPoints >= 3000) this.skillLevel = SkillLevel.ADVANCED;
         else if (totalPoints >= 500)  this.skillLevel = SkillLevel.INTERMEDIATE;
         else                          this.skillLevel = SkillLevel.BEGINNER;
     }
-
-    // ── Domain Events ─────────────────────────────────────────────────────────
-    // A Java `record` cannot extend a class (records implicitly extend java.lang.Record),
-    // so domain events that must be DomainEvent subtypes are immutable final classes.
 
     @Getter
     public static final class UserRegisteredEvent extends DomainEvent {

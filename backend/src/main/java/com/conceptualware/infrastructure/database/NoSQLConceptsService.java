@@ -5,41 +5,9 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.*;
 
-/**
- * Concept #11 — NoSQL Databases: Cassandra, Neo4j, InfluxDB (documentação e modelos):
- *
- *   CASSANDRA — Wide-Column Store:
- *     - Data model: keyspace → table → partition key → clustering columns → columns.
- *     - CQL (Cassandra Query Language): SQL-like but fundamentally different semantics.
- *     - Partitioning: data distributed by partition key via consistent hashing.
- *     - Replication: configurable RF (Replication Factor), multi-datacenter.
- *     - No JOINs: denormalization is required — design tables around query patterns.
- *     - Tunable consistency: ONE, QUORUM, ALL per read/write.
- *     - Best for: time-series, IoT, write-heavy, geo-distributed (Netflix, Twitter).
- *
- *   NEO4J — Graph Database:
- *     - Data model: Nodes (vertices) + Relationships (edges) + Properties.
- *     - Cypher query language: MATCH (n:Person)-[:KNOWS]->(m:Person) RETURN n,m.
- *     - ACID transactions, native graph storage (no adjacency matrix).
- *     - Best for: social networks, recommendation engines, fraud detection, knowledge graphs.
- *
- *   INFLUXDB — Time-Series Database:
- *     - Data model: measurement → tags (indexed) → fields (values) → timestamp.
- *     - Flux query language (v2+): functional, pipeline-based.
- *     - Automatic data retention policies and downsampling.
- *     - Best for: metrics, monitoring, IoT sensor data, financial tick data.
- *
- * Concept #11 — NoSQL data models, query languages, consistency models
- */
 @Service
 public class NoSQLConceptsService {
 
-    // ── Cassandra Schema (CQL) ─────────────────────────────────────────────────
-
-    /**
-     * CQL schema for ConceptualWare's algorithm execution logs.
-     * Design principle: ONE TABLE PER QUERY PATTERN (denormalize for read performance).
-     */
     public static class CassandraSchema {
 
         public static final String CREATE_KEYSPACE = """
@@ -51,8 +19,6 @@ public class NoSQLConceptsService {
             AND DURABLE_WRITES = true;
             """;
 
-        // Partition by user_id: all executions for a user on same node
-        // Clustering by executed_at DESC: most recent first without ALLOW FILTERING
         public static final String CREATE_ALGORITHM_EXECUTIONS = """
             CREATE TABLE IF NOT EXISTS conceptualware.algorithm_executions (
                 user_id       UUID,
@@ -71,7 +37,6 @@ public class NoSQLConceptsService {
                                 'compaction_window_size': 1};
             """;
 
-        // Secondary table for querying by algorithm (different partition key)
         public static final String CREATE_ALGORITHM_STATS = """
             CREATE TABLE IF NOT EXISTS conceptualware.algorithm_stats_by_name (
                 algorithm_name TEXT,
@@ -83,19 +48,18 @@ public class NoSQLConceptsService {
             );
             """;
 
-        // CQL queries (prepared statement style)
         public static final String INSERT_EXECUTION = """
             INSERT INTO conceptualware.algorithm_executions
                 (user_id, executed_at, algorithm_id, algorithm_name, input_size, duration_ms, complexity, success)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             USING TTL 7776000;
-            """; // TTL: 90 days
+            """;
 
         public static final String SELECT_USER_RECENT = """
             SELECT * FROM conceptualware.algorithm_executions
             WHERE user_id = ?
             LIMIT 50;
-            """; // Uses partition key → no ALLOW FILTERING needed
+            """;
 
         public static final String UPDATE_COUNTER = """
             UPDATE conceptualware.algorithm_stats_by_name
@@ -104,8 +68,6 @@ public class NoSQLConceptsService {
             WHERE algorithm_name = ? AND date = ? AND hour = ?;
             """;
     }
-
-    // ── Cassandra concepts ─────────────────────────────────────────────────────
 
     public record CassandraConsistencyLevel(
         String level, String description, int nodesRequired, boolean strong
@@ -124,11 +86,8 @@ public class NoSQLConceptsService {
         }
     }
 
-    // ── Neo4j Graph Model (Cypher) ─────────────────────────────────────────────
-
     public static class Neo4jSchema {
 
-        // Node labels and relationship types for ConceptualWare's concept graph
         public static final String CREATE_CONSTRAINTS = """
             CREATE CONSTRAINT user_id_unique IF NOT EXISTS
                 FOR (u:User) REQUIRE u.id IS UNIQUE;
@@ -140,7 +99,6 @@ public class NoSQLConceptsService {
                 FOR (c:Concept) ON (c.name);
             """;
 
-        // Cypher: Create knowledge graph
         public static final String CREATE_CONCEPT_GRAPH = """
             // Create concepts (nodes)
             CREATE (ds:Concept {id: 'data-structures', name: 'Data Structures', category: 4})
@@ -156,7 +114,6 @@ public class NoSQLConceptsService {
             CREATE (rbt)-[:RELATED_TO]->(skip)
             """;
 
-        // Cypher: Find all concepts a user has learned with their prerequisites
         public static final String FIND_LEARNING_PATH = """
             MATCH (user:User {id: $userId})-[:LEARNED]->(known:Concept)
             MATCH (target:Concept {id: $targetId})
@@ -166,7 +123,6 @@ public class NoSQLConceptsService {
             LIMIT 1
             """;
 
-        // Cypher: Recommendation — users who learned X also learned Y
         public static final String COLLABORATIVE_FILTER = """
             MATCH (me:User {id: $userId})-[:LEARNED]->(c:Concept)
             MATCH (similar:User)-[:LEARNED]->(c)
@@ -178,7 +134,6 @@ public class NoSQLConceptsService {
             LIMIT 10
             """;
 
-        // Cypher: Shortest path between two concepts
         public static final String CONCEPT_RELATIONSHIP_PATH = """
             MATCH p = shortestPath(
                 (start:Concept {name: $startName})-[*]-(end:Concept {name: $endName})
@@ -186,7 +141,6 @@ public class NoSQLConceptsService {
             RETURN p, length(p) AS distance
             """;
 
-        // Cypher: PageRank-like concept importance
         public static final String CONCEPT_CENTRALITY = """
             CALL gds.pageRank.stream('concept-graph')
             YIELD nodeId, score
@@ -196,15 +150,11 @@ public class NoSQLConceptsService {
             """;
     }
 
-    // ── InfluxDB Time-Series Model (Flux) ─────────────────────────────────────
-
     public static class InfluxDBSchema {
 
-        // Flux: Write algorithm execution metrics
         public static final String WRITE_POINT_FORMAT =
             "algorithm_runs,algorithm=%s,user=%s,status=%s duration_ms=%d,input_size=%d %d";
 
-        // Flux: Query last 1 hour of algorithm performance
         public static final String QUERY_RECENT_PERFORMANCE = """
             from(bucket: "metrics")
               |> range(start: -1h)
@@ -215,7 +165,6 @@ public class NoSQLConceptsService {
               |> sort(columns: ["_value"], desc: true)
             """;
 
-        // Flux: Downsampling — aggregate to 5-minute windows
         public static final String DOWNSAMPLE_TO_5MIN = """
             from(bucket: "metrics")
               |> range(start: -24h)
@@ -224,7 +173,6 @@ public class NoSQLConceptsService {
               |> to(bucket: "metrics-downsampled")
             """;
 
-        // Flux: Anomaly detection — flag runs > 2 stddev from mean
         public static final String DETECT_ANOMALIES = """
             data = from(bucket: "metrics")
               |> range(start: -1h)
@@ -238,7 +186,6 @@ public class NoSQLConceptsService {
               |> map(fn: (r) => ({r with threshold: r._value_mean + 2.0 * r._value_stddev}))
             """;
 
-        // Flux: Count executions per algorithm per day (time histogram)
         public static final String DAILY_HISTOGRAM = """
             from(bucket: "metrics")
               |> range(start: -30d)
@@ -248,8 +195,6 @@ public class NoSQLConceptsService {
               |> group(columns: ["algorithm"])
             """;
     }
-
-    // ── ETL Pipeline (Extract → Transform → Load) ─────────────────────────────
 
     public record ETLStep(String name, String description, String tool, String outputFormat) {}
 
@@ -267,8 +212,6 @@ public class NoSQLConceptsService {
                 "Spring Data Redis + TTL",                "JSON strings")
         );
     }
-
-    // ── OLTP vs OLAP comparison ───────────────────────────────────────────────
 
     public record WorkloadComparison(
         String type, String operations, String queryPattern,
@@ -293,15 +236,8 @@ public class NoSQLConceptsService {
         }
     }
 
-    // ── Data Warehouse star schema ────────────────────────────────────────────
-
-    /**
-     * Star Schema: one central fact table surrounded by dimension tables.
-     * Optimized for OLAP: denormalized, pre-joined dimensions, fast aggregations.
-     */
     public static class DataWarehouseSchema {
 
-        // Fact table: one row per algorithm execution event
         public static final String FACT_TABLE = """
             CREATE TABLE IF NOT EXISTS fact_algorithm_executions (
                 execution_id   BIGINT PRIMARY KEY,
@@ -314,7 +250,6 @@ public class NoSQLConceptsService {
             );
             """;
 
-        // Slowly Changing Dimension (SCD Type 2): tracks history
         public static final String DIM_USER = """
             CREATE TABLE IF NOT EXISTS dim_user (
                 user_sk        INT PRIMARY KEY,    -- surrogate key

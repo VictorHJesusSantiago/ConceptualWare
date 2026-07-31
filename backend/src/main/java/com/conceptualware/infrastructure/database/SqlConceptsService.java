@@ -7,41 +7,6 @@ import org.springframework.transaction.annotation.Isolation;
 
 import java.util.*;
 
-/**
- * Concept #11 — Databases: SQL Concepts (via H2 in-memory database):
- *
- *   DDL (Data Definition Language):
- *     CREATE TABLE, ALTER TABLE, DROP TABLE, CREATE INDEX, CREATE VIEW.
- *
- *   DML (Data Manipulation Language):
- *     INSERT, UPDATE, DELETE, SELECT, MERGE (UPSERT).
- *
- *   DCL (Data Control Language):
- *     GRANT, REVOKE (permission management).
- *
- *   TCL (Transaction Control Language):
- *     BEGIN TRANSACTION, COMMIT, ROLLBACK, SAVEPOINT.
- *
- *   Normalization: 1NF → 2NF → 3NF → BCNF
- *     1NF: Atomic values, no repeating groups.
- *     2NF: 1NF + no partial dependencies (all non-key cols depend on whole PK).
- *     3NF: 2NF + no transitive dependencies (non-key cols only depend on PK).
- *     BCNF: Stricter 3NF — every determinant is a candidate key.
- *
- *   JOINs: INNER, LEFT OUTER, RIGHT OUTER, FULL OUTER, CROSS, SELF.
- *
- *   Advanced SQL:
- *     CTEs (Common Table Expressions): WITH recursive_cte AS (...)
- *     Window Functions: ROW_NUMBER(), RANK(), DENSE_RANK(), LAG(), LEAD(), PARTITION BY
- *     Subqueries: correlated, scalar, EXISTS
- *     Stored Procedures (H2 functions simulate these)
- *
- *   MVCC (Multi-Version Concurrency Control):
- *     Each transaction sees a snapshot of the database at its start time.
- *     Isolation levels: READ UNCOMMITTED, READ COMMITTED, REPEATABLE READ, SERIALIZABLE.
- *
- * Concept #11 — OLTP vs OLAP, ETL, Data Warehouse
- */
 @Service
 @Transactional
 public class SqlConceptsService {
@@ -53,12 +18,8 @@ public class SqlConceptsService {
         initializeSchema();
     }
 
-    // ── DDL: Schema Creation ──────────────────────────────────────────────────
-
     private void initializeSchema() {
-        // Normalized schema demonstrating 1NF → BCNF
 
-        // employees: 1NF (atomic values, primary key)
         jdbc.execute("""
             CREATE TABLE IF NOT EXISTS departments (
                 id   INT PRIMARY KEY,
@@ -67,7 +28,6 @@ public class SqlConceptsService {
             )
             """);
 
-        // 2NF: employee data fully depends on employee_id (not partial key)
         jdbc.execute("""
             CREATE TABLE IF NOT EXISTS employees (
                 id            INT PRIMARY KEY,
@@ -80,7 +40,6 @@ public class SqlConceptsService {
             )
             """);
 
-        // 3NF: project depends on project_id; no transitive dependency
         jdbc.execute("""
             CREATE TABLE IF NOT EXISTS projects (
                 id         INT PRIMARY KEY,
@@ -91,7 +50,6 @@ public class SqlConceptsService {
             )
             """);
 
-        // Junction table (BCNF: no non-key attributes)
         jdbc.execute("""
             CREATE TABLE IF NOT EXISTS employee_projects (
                 employee_id INT REFERENCES employees(id),
@@ -102,7 +60,6 @@ public class SqlConceptsService {
             )
             """);
 
-        // View: CREATE VIEW (virtual table)
         jdbc.execute("""
             CREATE OR REPLACE VIEW employee_summary AS
             SELECT
@@ -117,7 +74,6 @@ public class SqlConceptsService {
             GROUP BY e.id, e.name, e.salary, d.name
             """);
 
-        // Index for query optimization
         jdbc.execute("CREATE INDEX IF NOT EXISTS idx_employees_dept ON employees(department_id)");
         jdbc.execute("CREATE INDEX IF NOT EXISTS idx_employees_email ON employees(email)");
 
@@ -125,7 +81,6 @@ public class SqlConceptsService {
     }
 
     private void seedData() {
-        // INSERT (DML) — idempotent check via MERGE
         jdbc.execute("MERGE INTO departments (id, name, budget) VALUES (1, 'Engineering', 1000000)");
         jdbc.execute("MERGE INTO departments (id, name, budget) VALUES (2, 'Marketing', 500000)");
         jdbc.execute("MERGE INTO departments (id, name, budget) VALUES (3, 'HR', 300000)");
@@ -147,9 +102,6 @@ public class SqlConceptsService {
         jdbc.execute("MERGE INTO employee_projects VALUES (4, 3, 'analyst', 40)");
     }
 
-    // ── DML: SELECT with all JOIN types ──────────────────────────────────────
-
-    /** INNER JOIN: only matching rows in both tables. */
     public List<Map<String, Object>> innerJoin() {
         return jdbc.queryForList("""
             SELECT e.name AS employee, d.name AS department
@@ -159,7 +111,6 @@ public class SqlConceptsService {
             """);
     }
 
-    /** LEFT OUTER JOIN: all employees, even without a department. */
     public List<Map<String, Object>> leftJoin() {
         return jdbc.queryForList("""
             SELECT e.name, d.name AS dept
@@ -168,7 +119,6 @@ public class SqlConceptsService {
             """);
     }
 
-    /** SELF JOIN: find each employee's manager. */
     public List<Map<String, Object>> selfJoin() {
         return jdbc.queryForList("""
             SELECT e.name AS employee, m.name AS manager
@@ -178,7 +128,6 @@ public class SqlConceptsService {
             """);
     }
 
-    /** CROSS JOIN: Cartesian product — all combinations. */
     public List<Map<String, Object>> crossJoin() {
         return jdbc.queryForList("""
             SELECT d.name AS dept, p.name AS project
@@ -189,12 +138,6 @@ public class SqlConceptsService {
             """);
     }
 
-    // ── Window Functions ──────────────────────────────────────────────────────
-
-    /**
-     * Window Functions: aggregate WITHOUT collapsing rows.
-     * ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD, NTILE, SUM OVER.
-     */
     public List<Map<String, Object>> windowFunctions() {
         return jdbc.queryForList("""
             SELECT
@@ -215,9 +158,6 @@ public class SqlConceptsService {
             """);
     }
 
-    // ── CTEs (Common Table Expressions) ──────────────────────────────────────
-
-    /** Recursive CTE: compute organizational hierarchy. */
     public List<Map<String, Object>> recursiveCTE() {
         return jdbc.queryForList("""
             WITH RECURSIVE org_hierarchy(id, name, manager_id, level, path) AS (
@@ -237,7 +177,6 @@ public class SqlConceptsService {
             """);
     }
 
-    /** Non-recursive CTE: summarize per department (improves readability vs subquery). */
     public List<Map<String, Object>> nonRecursiveCTE() {
         return jdbc.queryForList("""
             WITH dept_stats AS (
@@ -260,9 +199,6 @@ public class SqlConceptsService {
             """);
     }
 
-    // ── Subqueries ────────────────────────────────────────────────────────────
-
-    /** Correlated subquery: for each employee, find how many teammates they have. */
     public List<Map<String, Object>> correlatedSubquery() {
         return jdbc.queryForList("""
             SELECT e.name,
@@ -273,7 +209,6 @@ public class SqlConceptsService {
             """);
     }
 
-    /** EXISTS subquery: employees assigned to at least one project. */
     public List<Map<String, Object>> existsSubquery() {
         return jdbc.queryForList("""
             SELECT e.name FROM employees e
@@ -284,48 +219,23 @@ public class SqlConceptsService {
             """);
     }
 
-    // ── Transaction Isolation Levels (MVCC demonstration) ────────────────────
-
-    /**
-     * READ COMMITTED: default in PostgreSQL/Oracle.
-     * Each statement sees only committed data as of the statement's start.
-     */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public List<Map<String, Object>> readCommittedQuery() {
         return jdbc.queryForList("SELECT id, name, salary FROM employees ORDER BY id");
     }
 
-    /**
-     * REPEATABLE READ: default in MySQL InnoDB.
-     * All reads in a transaction see data as of transaction start — prevents non-repeatable reads.
-     */
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     public List<Map<String, Object>> repeatableReadQuery() {
-        // First read — establishes snapshot
         List<Map<String, Object>> first = jdbc.queryForList("SELECT id, salary FROM employees");
-        // Second read in same transaction — guaranteed to return same data (REPEATABLE READ)
         return jdbc.queryForList("SELECT id, salary FROM employees");
     }
 
-    /**
-     * SERIALIZABLE: strongest isolation.
-     * Transactions execute as if serial — prevents phantom reads.
-     * Performance: highest overhead due to range locks.
-     */
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public List<Map<String, Object>> serializableQuery() {
         return jdbc.queryForList("SELECT COUNT(*) AS count, AVG(salary) AS avg FROM employees");
     }
 
-    // ── Normalization demonstration ───────────────────────────────────────────
-
-    /**
-     * Demonstrates normalization violations and their resolution.
-     * The denormalized table below violates multiple normal forms.
-     */
     public void createNormalizationDemo() {
-        // Violates 1NF (multiple values in skills column), 2NF (dept_location depends on dept, not employee)
-        // 3NF (dept_manager depends on dept_id, not emp_id)
         jdbc.execute("""
             CREATE TABLE IF NOT EXISTS unnormalized_example (
                 emp_id      INT,
@@ -337,7 +247,6 @@ public class SqlConceptsService {
             )
             """);
 
-        // This is then resolved into: employees, departments, employee_skills (our existing schema)
         jdbc.execute("""
             CREATE TABLE IF NOT EXISTS employee_skills (
                 employee_id INT REFERENCES employees(id),
@@ -352,21 +261,13 @@ public class SqlConceptsService {
         jdbc.execute("MERGE INTO employee_skills VALUES (2, 'React')");
     }
 
-    // ── OLTP vs OLAP examples ─────────────────────────────────────────────────
-
-    /** OLTP query: fast point lookup (milliseconds). */
     @Transactional(readOnly = true)
     public Map<String, Object> oltpQuery(int employeeId) {
         return jdbc.queryForMap("SELECT * FROM employees WHERE id = ?", employeeId);
     }
 
-    /** OLAP query: full table scan aggregate (seconds on large data). */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> olapQuery() {
-        // COALESCE nos agregados: SUM/AVG/MIN/MAX de um grupo vazio (departamento
-        // sem funcionários, via LEFT JOIN) retornam NULL por semântica SQL — COUNT
-        // retorna 0 corretamente. Sem COALESCE, um departamento vazio quebraria
-        // qualquer consumidor que espere um número em vez de NULL.
         return jdbc.queryForList("""
             SELECT
                 d.name AS department,
@@ -384,16 +285,7 @@ public class SqlConceptsService {
             """);
     }
 
-    // ── ETL Pipeline simulation ────────────────────────────────────────────────
-
-    /**
-     * ETL: Extract → Transform → Load.
-     * Extract: read from source (employees table).
-     * Transform: calculate derived metrics.
-     * Load: write to data warehouse table.
-     */
     public int runETLPipeline() {
-        // Create data warehouse fact table
         jdbc.execute("""
             CREATE TABLE IF NOT EXISTS dw_employee_facts (
                 snapshot_date  DATE,
@@ -405,7 +297,6 @@ public class SqlConceptsService {
             )
             """);
 
-        // Extract + Transform + Load in one SQL (INSERT ... SELECT)
         return jdbc.update("""
             INSERT INTO dw_employee_facts
             SELECT
@@ -422,10 +313,7 @@ public class SqlConceptsService {
             """);
     }
 
-    // ── Stored procedure equivalent (H2 function) ────────────────────────────
-
     public void createStoredProcedures() {
-        // H2 uses ALIAS for stored procedures — same concept as MySQL/PostgreSQL procedures
         jdbc.execute("""
             CREATE ALIAS IF NOT EXISTS GET_DEPT_SALARY AS '
             import java.sql.*;
