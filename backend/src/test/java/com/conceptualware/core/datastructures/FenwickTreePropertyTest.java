@@ -6,12 +6,6 @@ import net.jqwik.api.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Concept #19 — Property-Based Testing (jqwik): em vez de exemplos fixos,
- * declaramos uma propriedade que deve valer para QUALQUER entrada válida —
- * jqwik gera centenas de casos aleatórios (incluindo edge cases: array vazio,
- * valores negativos, tamanho 1) automaticamente.
- */
 class FenwickTreePropertyTest {
 
     @Property
@@ -19,9 +13,6 @@ class FenwickTreePropertyTest {
             @ForAll("boundedValues") long[] values,
             @ForAll("validRangePairs") int[] range
     ) {
-        // Aplicar '%' ANTES de escolher min/max — fazer o inverso (min/max primeiro,
-        // '%' depois) quebra a ordenação, pois o módulo não preserva relação de ordem
-        // entre dois números diferentes (ex.: 347 % 27 pode ser maior que 774766 % 27).
         int a = Math.floorMod(range[0], values.length);
         int b = Math.floorMod(range[1], values.length);
         int l = Math.min(a, b);
@@ -49,11 +40,6 @@ class FenwickTreePropertyTest {
             previous = sum;
         }
     }
-
-    // Ranges explícitos via @Provide — anotações @LongRange empilhadas em long[]
-    // não restringem elementos de forma confiável em todas as versões do jqwik
-    // (edge-case injection pode ainda gerar Long.MAX_VALUE/MIN_VALUE). Um
-    // Arbitrary construído explicitamente é inequívoco.
 
     @Provide
     Arbitrary<long[]> boundedValues() {

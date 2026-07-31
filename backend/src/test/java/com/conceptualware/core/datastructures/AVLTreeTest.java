@@ -4,10 +4,6 @@ import com.conceptualware.core.datastructures.tree.AVLTree;
 import org.junit.jupiter.api.*;
 import static org.assertj.core.api.Assertions.*;
 
-/**
- * Concept #4  — Data Structures: AVL Tree self-balancing invariant
- * Concept #19 — Testing: property-based style (invariants hold after every mutation)
- */
 @DisplayName("AVL Tree — Self-Balancing Invariant Tests")
 class AVLTreeTest {
 
@@ -35,7 +31,6 @@ class AVLTreeTest {
     @Test
     @DisplayName("Left-Left case — triggers right rotation")
     void leftLeftRotation() {
-        // Inserting 30→20→10 causes LL imbalance → right rotation
         tree.insert(30);
         tree.insert(20);
         tree.insert(10);

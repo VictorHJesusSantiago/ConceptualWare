@@ -6,15 +6,8 @@ import java.util.*;
 
 import static org.assertj.core.api.Assertions.*;
 
-/**
- * Concept #4  — Data Structures: Red-Black Tree, B-Tree/B+Tree, Skip List,
- *               Sparse Table, Treap, Splay Tree, K-D Tree
- * Concept #19 — TDD: property-based testing, invariant verification
- */
 @DisplayName("Advanced Data Structures — Complete Test Suite")
 class DataStructuresTest {
-
-    // ── Red-Black Tree ────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("Red-Black Tree")
@@ -85,8 +78,6 @@ class DataStructuresTest {
         }
     }
 
-    // ── B-Tree ────────────────────────────────────────────────────────────────
-
     @Nested
     @DisplayName("B-Tree (min degree 3)")
     class BTreeTests {
@@ -120,8 +111,6 @@ class DataStructuresTest {
         }
     }
 
-    // ── B+Tree ────────────────────────────────────────────────────────────────
-
     @Nested
     @DisplayName("B+Tree")
     class BPlusTreeTests {
@@ -146,8 +135,6 @@ class DataStructuresTest {
             assertThat(range).hasSize(5).containsExactly("v3", "v4", "v5", "v6", "v7");
         }
     }
-
-    // ── Skip List ────────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("Skip List")
@@ -194,8 +181,6 @@ class DataStructuresTest {
         }
     }
 
-    // ── Sparse Table ─────────────────────────────────────────────────────────
-
     @Nested
     @DisplayName("Sparse Table (RMQ)")
     class SparseTableTests {
@@ -218,7 +203,7 @@ class DataStructuresTest {
         @DisplayName("Subrange minimum")
         void subrange() {
             SparseTable st = new SparseTable(new int[]{5, 2, 8, 3, 7, 1, 4});
-            assertThat(st.queryMin(2, 5)).isEqualTo(1); // min of [8,3,7,1]
+            assertThat(st.queryMin(2, 5)).isEqualTo(1);
         }
 
         @Test
@@ -245,8 +230,6 @@ class DataStructuresTest {
             assertThat(rmt.queryMax(0, 4)).isEqualTo(5);
         }
     }
-
-    // ── Treap ─────────────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("Treap")
@@ -280,8 +263,6 @@ class DataStructuresTest {
         }
     }
 
-    // ── Splay Tree ────────────────────────────────────────────────────────────
-
     @Nested
     @DisplayName("Splay Tree")
     class SplayTreeTests {
@@ -314,8 +295,6 @@ class DataStructuresTest {
         }
     }
 
-    // ── K-D Tree ─────────────────────────────────────────────────────────────
-
     @Nested
     @DisplayName("K-D Tree (2D)")
     class KDTreeTests {
@@ -340,7 +319,7 @@ class DataStructuresTest {
             KDTree.Point query = new KDTree.Point(new double[]{3.5, 3.5});
             Optional<KDTree.Point> nn = tree.nearestNeighbor(query);
             assertThat(nn).isPresent();
-            assertThat(nn.get().label()).isEqualTo("B"); // (3,4) is closest to (3.5,3.5)
+            assertThat(nn.get().label()).isEqualTo("B");
         }
 
         @Test
@@ -348,7 +327,7 @@ class DataStructuresTest {
         void rangeSearch() {
             KDTree tree = buildTestTree();
             List<KDTree.Point> results = tree.rangeSearch(
-                new double[]{0, 0}, new double[]{4, 5}); // box [0-4, 0-5]
+                new double[]{0, 0}, new double[]{4, 5});
             assertThat(results).extracting(KDTree.Point::label)
                 .containsExactlyInAnyOrder("A", "B");
         }
