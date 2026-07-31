@@ -2,16 +2,7 @@ package com.conceptualware.core.datastructures.graph;
 
 import java.util.*;
 
-/**
- * Concept #4 — Grafo não-dirigido, Dígrafo, Grafo ponderado, DAG
- *   Lista de adjacência, Matriz de adjacência, Disjoint Set / Union-Find
- * Concept #5 — BFS, DFS, Dijkstra, Bellman-Ford, Floyd-Warshall, Kruskal, Prim,
- *   Topological Sort, Cycle Detection, A*, Max Flow
- * Concept #28 — Teoria dos grafos, Grafo euleriano/hamiltoniano, MST
- */
 public class Graph {
-
-    // ── Adjacency List Graph ───────────────────────────────────────────────────
 
     public record Edge(int to, double weight) implements Comparable<Edge> {
         @Override
@@ -38,7 +29,6 @@ public class Graph {
     public List<Edge> neighbors(int v) { return adjacencyList.get(v); }
     public int vertices() { return vertices; }
 
-    /** Grafo transposto (todas as arestas invertidas) — usado pelo algoritmo de Kosaraju (SCC). */
     public Graph transpose() {
         Graph result = new Graph(vertices, true);
         for (int v = 0; v < vertices; v++) {
@@ -48,8 +38,6 @@ public class Graph {
         }
         return result;
     }
-
-    // ── BFS — Concept #5 ──────────────────────────────────────────────────────
 
     public List<Integer> bfs(int start) {
         List<Integer> order = new ArrayList<>();
@@ -70,7 +58,6 @@ public class Graph {
         return order;
     }
 
-    /** BFS shortest path (unweighted). */
     public int[] bfsShortestPath(int start) {
         int[] dist = new int[vertices];
         Arrays.fill(dist, -1);
@@ -89,8 +76,6 @@ public class Graph {
         return dist;
     }
 
-    // ── DFS — Concept #5 ──────────────────────────────────────────────────────
-
     public List<Integer> dfs(int start) {
         List<Integer> order = new ArrayList<>();
         boolean[] visited = new boolean[vertices];
@@ -105,8 +90,6 @@ public class Graph {
             if (!visited[e.to()]) dfsHelper(e.to(), visited, order);
         }
     }
-
-    // ── Cycle Detection — Floyd's algorithm is in algorithms; here use DFS ─────
 
     public boolean hasCycle() {
         boolean[] visited = new boolean[vertices];
@@ -126,8 +109,6 @@ public class Graph {
         inStack[v] = false;
         return false;
     }
-
-    // ── Topological Sort (Kahn's BFS algorithm) — Concept #5 ─────────────────
 
     public List<Integer> topologicalSort() {
         int[] inDegree = new int[vertices];
@@ -149,8 +130,6 @@ public class Graph {
         return order;
     }
 
-    // ── Disjoint Set / Union-Find — Concept #4 ────────────────────────────────
-
     public static class DisjointSet {
         private final int[] parent, rank;
 
@@ -160,14 +139,13 @@ public class Graph {
         }
 
         public int find(int x) {
-            if (parent[x] != x) parent[x] = find(parent[x]); // Path compression
+            if (parent[x] != x) parent[x] = find(parent[x]);
             return parent[x];
         }
 
         public boolean union(int x, int y) {
             int px = find(x), py = find(y);
             if (px == py) return false;
-            // Union by rank
             if (rank[px] < rank[py]) { int t = px; px = py; py = t; }
             parent[py] = px;
             if (rank[px] == rank[py]) rank[px]++;
@@ -176,8 +154,6 @@ public class Graph {
 
         public boolean connected(int x, int y) { return find(x) == find(y); }
     }
-
-    // ── Adjacency Matrix representation ───────────────────────────────────────
 
     public static class AdjacencyMatrix {
         private final double[][] matrix;
