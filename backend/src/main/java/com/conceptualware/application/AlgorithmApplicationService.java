@@ -20,13 +20,6 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
-/**
- * Concept #12 — Arquitetura: Application Service (orquestra domain + infrastructure)
- * Concept #14 — SOLID: SRP, OCP, DIP (depends on abstractions)
- * Concept #18 — Async: CompletableFuture, @Async
- * Concept #26 — Performance: Caching (@Cacheable), Connection pooling
- * Concept #27 — Observabilidade: Métricas, Logs estruturados
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -35,9 +28,7 @@ public class AlgorithmApplicationService {
     private final AlgorithmRepository algorithmRepository;
     private final MetricsService metricsService;
 
-    // ── Execute Algorithm — returns step-by-step trace ────────────────────────
-
-    @Async("algorithmExecutor") // CPU-bound — platform thread pool (Concept #18)
+    @Async("algorithmExecutor")
     public CompletableFuture<ExecutionResult> executeAlgorithm(
             String algorithmName, int[] input) {
 
@@ -78,8 +69,6 @@ public class AlgorithmApplicationService {
         return s.substring(0, 1).toUpperCase() + s.substring(1).toLowerCase();
     }
 
-    // ── DP Problems ───────────────────────────────────────────────────────────
-
     public DpResult solveDpProblem(String problem, Object... args) {
         return switch (problem.toLowerCase()) {
             case "fibonacci" -> new DpResult(problem,
@@ -101,8 +90,6 @@ public class AlgorithmApplicationService {
         };
     }
 
-    // ── Queries ───────────────────────────────────────────────────────────────
-
     @Cacheable(value = "algorithms", key = "#slug")
     public Optional<Algorithm> findBySlug(String slug) {
         log.debug("Cache miss for algorithm slug={}", slug);
@@ -122,8 +109,6 @@ public class AlgorithmApplicationService {
     public Algorithm save(Algorithm algorithm) {
         return algorithmRepository.save(algorithm);
     }
-
-    // ── Records (return types) ────────────────────────────────────────────────
 
     public record ExecutionResult(
         String algorithmName,
