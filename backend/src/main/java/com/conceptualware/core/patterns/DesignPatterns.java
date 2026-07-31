@@ -4,26 +4,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.*;
 
-/**
- * Concept #13 — Todos os 23 Padrões de Projeto GoF + extras:
- *
- * CRIACIONAIS: Singleton, Factory Method, Abstract Factory, Builder, Prototype, Object Pool
- * ESTRUTURAIS:  Adapter, Bridge, Composite, Decorator, Facade, Flyweight, Proxy
- * COMPORTAMENTAIS: Chain of Responsibility, Command, Iterator, Mediator, Memento,
- *                  Observer, State, Strategy, Template Method, Visitor, Interpreter,
- *                  Null Object
- *
- * Concept #7  — OOP: interfaces, abstract classes, generics, inner classes
- * Concept #14 — Princípios: SOLID, DRY, SoC
- * Concept #12 — Anti-padrões documentados
- */
 public class DesignPatterns {
-
-    // ══════════════════════════════════════════════════════════════════════════
-    // CRIACIONAIS
-    // ══════════════════════════════════════════════════════════════════════════
-
-    // ── Singleton (thread-safe via enum) ─────────────────────────────────────
 
     public enum AlgorithmRegistry {
         INSTANCE;
@@ -31,8 +12,6 @@ public class DesignPatterns {
         public void register(String name, Object algo) { registry.put(name, algo); }
         public Object get(String name) { return registry.get(name); }
     }
-
-    // ── Factory Method ────────────────────────────────────────────────────────
 
     public interface Sortable {
         int[] sort(int[] arr);
@@ -71,8 +50,6 @@ public class DesignPatterns {
         }
     }
 
-    // ── Abstract Factory ──────────────────────────────────────────────────────
-
     public interface DataStructureFactory<T extends Comparable<T>> {
         com.conceptualware.core.datastructures.tree.BinarySearchTree<T> createTree();
         com.conceptualware.core.datastructures.linear.Stack<T> createStack();
@@ -89,8 +66,6 @@ public class DesignPatterns {
             return new com.conceptualware.core.datastructures.linear.Stack<>();
         }
     }
-
-    // ── Builder ───────────────────────────────────────────────────────────────
 
     public record AlgorithmConfig(String name, int timeoutMs, int maxInputSize,
                                    boolean memoEnabled, String complexity) {
@@ -115,8 +90,6 @@ public class DesignPatterns {
         }
     }
 
-    // ── Prototype ─────────────────────────────────────────────────────────────
-
     public static class AlgorithmSnapshot implements Cloneable {
         public String name;
         public List<Integer> steps;
@@ -138,8 +111,6 @@ public class DesignPatterns {
             }
         }
     }
-
-    // ── Object Pool ───────────────────────────────────────────────────────────
 
     public static class ObjectPool<T> {
         private final Queue<T> pool = new ConcurrentLinkedQueue<>();
@@ -165,12 +136,6 @@ public class DesignPatterns {
         public int available() { return pool.size(); }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // ESTRUTURAIS
-    // ══════════════════════════════════════════════════════════════════════════
-
-    // ── Adapter ───────────────────────────────────────────────────────────────
-
     public interface NumberSorter { List<Integer> sort(List<Integer> numbers); }
 
     public static class LegacySorter {
@@ -191,8 +156,6 @@ public class DesignPatterns {
             return result;
         }
     }
-
-    // ── Bridge ────────────────────────────────────────────────────────────────
 
     public interface Renderer { String render(String content, String format); }
     public static class JsonRenderer implements Renderer {
@@ -219,8 +182,6 @@ public class DesignPatterns {
             return renderer.render(Arrays.toString(steps), "steps");
         }
     }
-
-    // ── Composite ─────────────────────────────────────────────────────────────
 
     public interface AlgorithmComponent {
         String describe();
@@ -252,8 +213,6 @@ public class DesignPatterns {
             return children.stream().mapToInt(AlgorithmComponent::estimateComplexity).sum();
         }
     }
-
-    // ── Decorator ─────────────────────────────────────────────────────────────
 
     public interface AlgorithmExecutor {
         int[] execute(int[] input);
@@ -291,8 +250,6 @@ public class DesignPatterns {
         public List<String> logs() { return Collections.unmodifiableList(logs); }
     }
 
-    // ── Facade ────────────────────────────────────────────────────────────────
-
     public static class AlgorithmFacade {
         private final com.conceptualware.core.algorithms.sorting.SortingAlgorithms sorting;
         private final com.conceptualware.core.algorithms.string.StringAlgorithms string;
@@ -315,8 +272,6 @@ public class DesignPatterns {
         }
     }
 
-    // ── Flyweight ─────────────────────────────────────────────────────────────
-
     public record ComplexityLabel(String bigO, String description) {}
 
     public static class ComplexityFlyweightFactory {
@@ -326,8 +281,6 @@ public class DesignPatterns {
             return pool.computeIfAbsent(bigO, k -> new ComplexityLabel(k, description));
         }
     }
-
-    // ── Proxy ─────────────────────────────────────────────────────────────────
 
     public interface AlgorithmService {
         int[] sort(String algorithmName, int[] arr);
@@ -352,12 +305,6 @@ public class DesignPatterns {
             return cache.computeIfAbsent(key, k -> real.sort(algorithmName, arr));
         }
     }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    // COMPORTAMENTAIS
-    // ══════════════════════════════════════════════════════════════════════════
-
-    // ── Chain of Responsibility ───────────────────────────────────────────────
 
     public interface ValidationHandler {
         void setNext(ValidationHandler next);
@@ -385,8 +332,6 @@ public class DesignPatterns {
             return passToNext(input);
         }
     }
-
-    // ── Command ───────────────────────────────────────────────────────────────
 
     public interface Command { void execute(); void undo(); }
 
@@ -419,8 +364,6 @@ public class DesignPatterns {
         public void undo() { if (!history.isEmpty()) history.pop().undo(); }
     }
 
-    // ── Observer / Pub-Sub ────────────────────────────────────────────────────
-
     public interface AlgorithmEventListener {
         void onStepExecuted(int step, int[] currentState);
         void onCompleted(int[] finalResult, long durationNs);
@@ -440,8 +383,6 @@ public class DesignPatterns {
         }
     }
 
-    // ── Strategy ─────────────────────────────────────────────────────────────
-
     @FunctionalInterface
     public interface SortStrategy { int[] sort(int[] arr); }
 
@@ -451,8 +392,6 @@ public class DesignPatterns {
         public void setStrategy(SortStrategy strategy) { this.strategy = strategy; }
         public int[] sort(int[] arr) { return strategy.sort(arr); }
     }
-
-    // ── State ─────────────────────────────────────────────────────────────────
 
     public enum ExecutionState { IDLE, RUNNING, PAUSED, COMPLETED, ERROR }
 
@@ -471,10 +410,7 @@ public class DesignPatterns {
         public int[] getResult() { return currentResult; }
     }
 
-    // ── Template Method ───────────────────────────────────────────────────────
-
     public abstract static class AlgorithmTemplate {
-        // Template method — defines the algorithm skeleton
         public final int[] run(int[] input) {
             validate(input);
             int[] preprocessed = preprocess(input);
@@ -497,8 +433,6 @@ public class DesignPatterns {
         }
     }
 
-    // ── Memento ───────────────────────────────────────────────────────────────
-
     public static class AlgorithmMemento {
         private final int[] state;
         private final int step;
@@ -514,8 +448,6 @@ public class DesignPatterns {
         public int historySize()              { return history.size(); }
     }
 
-    // ── Visitor ───────────────────────────────────────────────────────────────
-
     public interface AlgorithmVisitor<T> {
         T visitSort(Sortable sorter);
         T visitSearch(SearchAlgorithmVisitable searcher);
@@ -524,15 +456,11 @@ public class DesignPatterns {
     public interface Visitable { <T> T accept(AlgorithmVisitor<T> visitor); }
     public interface SearchAlgorithmVisitable extends Visitable { List<Integer> search(String text, String pattern); }
 
-    // ── Mediator ─────────────────────────────────────────────────────────────
-
     public interface Colleague { void setMediator(AlgorithmMediator mediator); }
 
     public interface AlgorithmMediator {
         void notify(Object sender, String event, Object data);
     }
-
-    // ── Iterator ─────────────────────────────────────────────────────────────
 
     public static class AlgorithmStepIterator implements Iterator<int[]> {
         private final int[] arr;
@@ -568,14 +496,10 @@ public class DesignPatterns {
         }
     }
 
-    // ── Null Object ────────────────────────────────────────────────────────────
-
     public static class NullAlgorithmExecutor implements AlgorithmExecutor {
         @Override
-        public int[] execute(int[] input) { return input; } // no-op
+        public int[] execute(int[] input) { return input; }
     }
-
-    // ── Interpreter (mini-DSL for complexity notation) ────────────────────────
 
     public interface ComplexityExpression { double evaluate(int n); }
 
