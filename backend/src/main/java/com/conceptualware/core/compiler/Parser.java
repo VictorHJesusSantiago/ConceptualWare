@@ -3,43 +3,6 @@ package com.conceptualware.core.compiler;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Concept #10 — Parsing / Syntactic Analysis:
- *
- *   The Parser is the SECOND phase of the compiler pipeline.
- *   Input:  flat list of Tokens from the Lexer
- *   Output: AST (Abstract Syntax Tree)
- *
- *   Strategy: Recursive Descent Parser (top-down, LL(1)):
- *     • Each grammar rule → one parseXxx() method
- *     • Current token guides which rule to apply (predictive parsing)
- *     • Operator precedence handled via call chain nesting:
- *         parseOr → parseAnd → parseEquality → parseComparison
- *             → parseAddSub → parseMulDiv → parseUnary → parsePrimary
- *     • Panic-mode error recovery: on syntax error, advance until synchronization
- *       point (statement boundary) to report as many errors as possible
- *
- *   ConceptLang Grammar (simplified EBNF):
- *     program       := stmt*
- *     stmt          := varDecl | fnDecl | classDecl | if | while | for
- *                    | return | break | continue | print | exprStmt | block
- *     varDecl       := ('var'|'const') IDENT (':' TYPE)? ('=' expr)? ';'
- *     fnDecl        := 'fn' IDENT '(' params? ')' ('->' TYPE)? block
- *     if            := 'if' '(' expr ')' stmt ('else' stmt)?
- *     while         := 'while' '(' expr ')' block
- *     expr          := assignment
- *     assignment    := ternary (('='|'+='|'-='|'*='|'/=') assignment)?
- *     ternary       := or ('?' expr ':' ternary)?
- *     or            := and ('||' and)*
- *     and           := equality ('&&' equality)*
- *     equality      := comparison (('=='|'!=') comparison)*
- *     comparison    := addSub (('<'|'<='|'>'|'>=') addSub)*
- *     addSub        := mulDiv (('+'|'-') mulDiv)*
- *     mulDiv        := unary (('*'|'/'|'%') unary)*
- *     unary         := ('!'|'-'|'~'|'++'|'--') unary | postfix
- *     postfix       := primary ('++'|'--'|'[' expr ']'|'.' IDENT|'(' args ')')*
- *     primary       := LITERAL | IDENT | '(' expr ')' | '[' args ']' | 'new' IDENT '(' args ')'
- */
 public class Parser {
 
     private final List<Token> tokens;
@@ -49,8 +12,6 @@ public class Parser {
     public Parser(List<Token> tokens) {
         this.tokens = tokens;
     }
-
-    // ── Public API ────────────────────────────────────────────────────────────
 
     public AST.Stmt.Program parse() {
         List<AST.Stmt> stmts = new ArrayList<>();
@@ -62,8 +23,6 @@ public class Parser {
     }
 
     public List<String> errors() { return List.copyOf(errors); }
-
-    // ── Statement Parsing ─────────────────────────────────────────────────────
 
     private AST.Stmt statement() {
         return switch (peek().type()) {
@@ -198,8 +157,6 @@ public class Parser {
         return new AST.Stmt.ExprStmt(e, line);
     }
 
-    // ── Expression Parsing (Pratt-style via method chain) ─────────────────────
-
     private AST.Expr expression() { return assignment(); }
 
     private AST.Expr assignment() {
@@ -209,7 +166,7 @@ public class Parser {
                      Token.TokenType.SLASH_EQUAL)) {
             String op = previous().lexeme();
             int line = previous().line();
-            AST.Expr val = assignment(); // right-associative
+            AST.Expr val = assignment();
             return new AST.Expr.Assignment(left, op, val, line);
         }
         return left;
@@ -218,8 +175,6 @@ public class Parser {
     private AST.Expr ternary() {
         AST.Expr cond = or();
         if (match(Token.TokenType.IDENTIFIER) && previous().lexeme().equals("?")) {
-            // manually handle ? since we haven't made it a token type
-            // check via: peek if it's ? symbol
         }
         return cond;
     }
@@ -359,16 +314,12 @@ public class Parser {
         throw error("Unexpected token: " + peek());
     }
 
-    // ── Type parsing ──────────────────────────────────────────────────────────
-
     private String typeName() {
         return switch (peek().type()) {
             case INT, FLOAT, BOOL, STRING, VOID, IDENTIFIER -> { advance(); yield previous().lexeme(); }
             default -> throw error("Expected type name, got: " + peek());
         };
     }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private boolean match(Token.TokenType type) {
         if (check(type)) { advance(); return true; }

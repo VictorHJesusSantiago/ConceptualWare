@@ -3,34 +3,14 @@ package com.conceptualware.core.compiler;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Concept #10 — Lexical Analysis (Scanning):
- *
- *   The Lexer is the FIRST phase of a compiler/interpreter pipeline.
- *   It reads raw source characters and groups them into meaningful tokens.
- *
- *   Techniques used here:
- *     • Maximal munch rule  — always extend the current token as far as possible
- *       (e.g., "==" is one EQUAL_EQUAL token, not two EQUAL tokens)
- *     • Keyword disambiguation — identifiers are checked against a keyword table
- *     • String escape sequences — \n, \t, \\, \" inside string literals
- *     • Multi-character operators — <=, >=, ==, !=, &&, ||, ->, <<, >>
- *     • Line/column tracking for error reporting
- *
- *   ConceptLang grammar this lexer supports:
- *     var x: int = 42;
- *     fn add(a: int, b: int) -> int { return a + b; }
- *     if (x > 0) { print("positive"); } else { print("non-positive"); }
- *     while (x > 0) { x -= 1; }
- */
 public class Lexer {
 
     private final String source;
     private final List<Token> tokens = new ArrayList<>();
     private final List<String> errors  = new ArrayList<>();
 
-    private int start   = 0;  // start of current lexeme
-    private int current = 0;  // current scanning position
+    private int start   = 0;
+    private int current = 0;
     private int line    = 1;
     private int column  = 1;
     private int lexemeStartColumn = 1;
@@ -38,8 +18,6 @@ public class Lexer {
     public Lexer(String source) {
         this.source = source;
     }
-
-    // ── Public API ────────────────────────────────────────────────────────────
 
     public List<Token> tokenize() {
         while (!isAtEnd()) {
@@ -53,12 +31,9 @@ public class Lexer {
 
     public List<String> errors() { return List.copyOf(errors); }
 
-    // ── Core Scanning ─────────────────────────────────────────────────────────
-
     private void scanToken() {
         char c = advance();
         switch (c) {
-            // Single-character tokens
             case '(' -> addToken(Token.TokenType.LEFT_PAREN);
             case ')' -> addToken(Token.TokenType.RIGHT_PAREN);
             case '{' -> addToken(Token.TokenType.LEFT_BRACE);
@@ -80,8 +55,8 @@ public class Lexer {
                                  match('-') ? Token.TokenType.MINUS_MINUS :
                                  match('=') ? Token.TokenType.MINUS_EQUAL : Token.TokenType.MINUS);
             case '/' -> {
-                if (match('/'))      lineComment();     // // single-line comment
-                else if (match('*')) blockComment();    // /* block comment */
+                if (match('/'))      lineComment();
+                else if (match('*')) blockComment();
                 else if (match('=')) addToken(Token.TokenType.SLASH_EQUAL);
                 else                 addToken(Token.TokenType.SLASH);
             }
@@ -94,11 +69,9 @@ public class Lexer {
             case '&' -> addToken(match('&') ? Token.TokenType.AND           : Token.TokenType.AMPERSAND);
             case '|' -> addToken(match('|') ? Token.TokenType.OR            : Token.TokenType.PIPE);
 
-            // Whitespace
-            case ' ', '\r', '\t' -> {} // skip
+            case ' ', '\r', '\t' -> {}
             case '\n' -> { line++; column = 1; }
 
-            // String literals
             case '"' -> stringLiteral();
 
             default -> {
@@ -109,9 +82,6 @@ public class Lexer {
         }
     }
 
-    // ── Literal Scanning ──────────────────────────────────────────────────────
-
-    /** Scan a string literal, processing escape sequences. */
     private void stringLiteral() {
         var sb = new StringBuilder();
         while (!isAtEnd() && peek() != '"') {
@@ -133,24 +103,22 @@ public class Lexer {
             }
         }
         if (isAtEnd()) { error("Unterminated string literal"); return; }
-        advance(); // closing "
+        advance();
         addToken(Token.TokenType.STRING_LITERAL, sb.toString());
     }
 
-    /** Scan integer or float literal (supports 0x hex, 0b binary, underscore separators). */
     private void numberLiteral() {
         boolean isFloat = false;
 
-        // Hex: 0x1F, Binary: 0b1010
         if (source.charAt(start) == '0' && !isAtEnd()) {
             if (peek() == 'x' || peek() == 'X') {
-                advance(); // x
+                advance();
                 while (!isAtEnd() && isHexDigit(peek())) advance();
                 long value = Long.parseLong(source.substring(start + 2, current).replace("_", ""), 16);
                 addToken(Token.TokenType.INTEGER_LITERAL, (int) value);
                 return;
             } else if (peek() == 'b' || peek() == 'B') {
-                advance(); // b
+                advance();
                 while (!isAtEnd() && (peek() == '0' || peek() == '1' || peek() == '_')) advance();
                 long value = Long.parseLong(source.substring(start + 2, current).replace("_", ""), 2);
                 addToken(Token.TokenType.INTEGER_LITERAL, (int) value);
@@ -161,10 +129,9 @@ public class Lexer {
         while (!isAtEnd() && (Character.isDigit(peek()) || peek() == '_')) advance();
         if (!isAtEnd() && peek() == '.' && isDigitAt(current + 1)) {
             isFloat = true;
-            advance(); // .
+            advance();
             while (!isAtEnd() && (Character.isDigit(peek()) || peek() == '_')) advance();
         }
-        // Scientific notation: 1e10, 1.5e-3
         if (!isAtEnd() && (peek() == 'e' || peek() == 'E')) {
             isFloat = true;
             advance();
@@ -177,7 +144,6 @@ public class Lexer {
         else         addToken(Token.TokenType.INTEGER_LITERAL,  Integer.parseInt(text));
     }
 
-    /** Scan identifier or keyword. */
     private void identifier() {
         while (!isAtEnd() && isIdentPart(peek())) advance();
         String text = source.substring(start, current);
@@ -191,14 +157,12 @@ public class Lexer {
         addToken(type, literal);
     }
 
-    // ── Comment Handling ──────────────────────────────────────────────────────
-
     private void lineComment() {
         while (!isAtEnd() && peek() != '\n') advance();
     }
 
     private void blockComment() {
-        int depth = 1; // supports nested /* /* */ */
+        int depth = 1;
         while (!isAtEnd() && depth > 0) {
             if (peek() == '\n') { line++; column = 1; }
             if (peek() == '/' && peekNext() == '*') { depth++; advance(); }
@@ -206,8 +170,6 @@ public class Lexer {
             advance();
         }
     }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private char advance() {
         char c = source.charAt(current++);

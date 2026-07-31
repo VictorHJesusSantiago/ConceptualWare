@@ -1,56 +1,37 @@
 package com.conceptualware.core.compiler;
 
-/**
- * Concept #10 — Lexer / Tokenizer:
- *   A token is the smallest meaningful unit in source code.
- *   The lexer converts a raw character stream → sequence of tokens.
- *
- *   Token types cover: literals, identifiers, keywords, operators, delimiters.
- *   Each token stores its type, lexeme (raw text), and source position for
- *   precise error messages ("line 3, column 12: expected ';'").
- */
 public record Token(TokenType type, String lexeme, Object literal, int line, int column) {
 
     public enum TokenType {
-        // ── Literals ──────────────────────────────────────────────────────────
         INTEGER_LITERAL, FLOAT_LITERAL, STRING_LITERAL, BOOL_LITERAL, NULL_LITERAL,
 
-        // ── Identifiers & Keywords ────────────────────────────────────────────
         IDENTIFIER,
-        // Keywords (reserved words — cannot be used as identifiers)
         VAR, CONST, FN, RETURN, IF, ELSE, WHILE, FOR, BREAK, CONTINUE,
         PRINT, TRUE, FALSE, NULL, INT, FLOAT, BOOL, STRING, VOID,
         CLASS, NEW, THIS, IMPORT,
 
-        // ── Arithmetic Operators ──────────────────────────────────────────────
         PLUS, MINUS, STAR, SLASH, PERCENT, POWER,
-        PLUS_PLUS, MINUS_MINUS,            // ++ --
-        PLUS_EQUAL, MINUS_EQUAL,           // += -=
-        STAR_EQUAL, SLASH_EQUAL,           // *= /=
+        PLUS_PLUS, MINUS_MINUS,
+        PLUS_EQUAL, MINUS_EQUAL,
+        STAR_EQUAL, SLASH_EQUAL,
 
-        // ── Comparison Operators ──────────────────────────────────────────────
-        EQUAL_EQUAL, BANG_EQUAL,           // == !=
-        LESS, LESS_EQUAL,                  // < <=
-        GREATER, GREATER_EQUAL,            // > >=
+        EQUAL_EQUAL, BANG_EQUAL,
+        LESS, LESS_EQUAL,
+        GREATER, GREATER_EQUAL,
 
-        // ── Logical Operators ─────────────────────────────────────────────────
-        AND, OR, BANG,                     // && || !
+        AND, OR, BANG,
 
-        // ── Bitwise Operators ─────────────────────────────────────────────────
-        AMPERSAND, PIPE, CARET, TILDE,    // & | ^ ~
-        LEFT_SHIFT, RIGHT_SHIFT,           // << >>
+        AMPERSAND, PIPE, CARET, TILDE,
+        LEFT_SHIFT, RIGHT_SHIFT,
 
-        // ── Assignment ────────────────────────────────────────────────────────
-        EQUAL,                             // =
+        EQUAL,
 
-        // ── Delimiters ────────────────────────────────────────────────────────
-        LEFT_PAREN, RIGHT_PAREN,           // ( )
-        LEFT_BRACE, RIGHT_BRACE,           // { }
-        LEFT_BRACKET, RIGHT_BRACKET,       // [ ]
-        SEMICOLON, COLON, COMMA, DOT,      // ; : , .
-        ARROW,                             // ->
+        LEFT_PAREN, RIGHT_PAREN,
+        LEFT_BRACE, RIGHT_BRACE,
+        LEFT_BRACKET, RIGHT_BRACKET,
+        SEMICOLON, COLON, COMMA, DOT,
+        ARROW,
 
-        // ── Special ───────────────────────────────────────────────────────────
         EOF, ERROR
     }
 

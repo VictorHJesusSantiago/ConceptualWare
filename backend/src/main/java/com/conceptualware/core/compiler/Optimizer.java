@@ -4,48 +4,6 @@ import com.conceptualware.core.compiler.IRGenerator.IR;
 
 import java.util.*;
 
-/**
- * Concept #10 — Compiler Optimizations:
- *
- *   Optimizations are applied to the IR before code generation.
- *   They reduce execution time or memory usage without changing semantics.
- *
- *   CLASSICAL IR OPTIMIZATIONS (implemented here):
- *
- *   1. CONSTANT FOLDING:
- *      Replace expressions with constant operands at compile-time.
- *        t1 = 3 + 4  →  t1 = 7
- *        t2 = 2 * 6  →  t2 = 12
- *      Works on arithmetic, boolean, and comparison operations.
- *
- *   2. CONSTANT PROPAGATION:
- *      Substitute known-constant variables throughout their use.
- *        x = 5; t1 = x + 3  →  t1 = 8
- *      Combined with constant folding, eliminates many redundant computations.
- *
- *   3. DEAD CODE ELIMINATION (DCE):
- *      Remove instructions whose results are never used.
- *        t1 = a + b  (if t1 is never read afterward)
- *      Uses a simple liveness analysis: scan backward, track which vars are live.
- *
- *   4. COMMON SUBEXPRESSION ELIMINATION (CSE):
- *      Reuse previous computed values instead of recomputing.
- *        t1 = a + b; t2 = a + b  →  t1 = a + b; t2 = t1
- *      Uses a value-number map: (op, left, right) → first temp that computed it.
- *
- *   5. ALGEBRAIC SIMPLIFICATIONS:
- *        x + 0  →  x        x * 1  →  x
- *        x - 0  →  x        x / 1  →  x
- *        x * 0  →  0        x ** 0 →  1
- *        x ** 1 →  x        0 / x  →  0
- *
- *   6. COPY PROPAGATION:
- *      Replace copies (x = y) with direct uses of y.
- *        x = y; z = x + 1  →  z = y + 1
- *      Makes the original copy dead, enabling DCE.
- *
- *   Passes are run iteratively until fixed-point (no more changes) — typically 2-3 rounds.
- */
 public class Optimizer {
 
     public record OptimizationStats(
@@ -68,8 +26,6 @@ public class Optimizer {
     private int cseSubstitutions     = 0;
     private int copyPropagations     = 0;
     private int algebraicSimplifications = 0;
-
-    // ── Public API ────────────────────────────────────────────────────────────
 
     public OptimizationStats optimize(List<IR> input) {
         List<IR> ir = new ArrayList<>(input);
@@ -98,8 +54,6 @@ public class Optimizer {
             + copyPropagations + algebraicSimplifications;
     }
 
-    // ── Pass 1: Constant Folding ──────────────────────────────────────────────
-
     private List<IR> constantFoldingPass(List<IR> ir) {
         List<IR> result = new ArrayList<>();
         for (var inst : ir) {
@@ -126,14 +80,11 @@ public class Optimizer {
                 default -> Double.NaN;
             };
             if (Double.isNaN(res)) return null;
-            // Keep int if both were ints
             String val = (res == Math.floor(res) && !Double.isInfinite(res) && !left.contains(".") && !right.contains("."))
                 ? String.valueOf((long) res) : String.valueOf(res);
             return new IR.Copy(result, val);
         } catch (NumberFormatException e) { return null; }
     }
-
-    // ── Pass 2: Constant Propagation ─────────────────────────────────────────
 
     private List<IR> constantPropagationPass(List<IR> ir) {
         Map<String, String> constants = new HashMap<>();
@@ -141,11 +92,10 @@ public class Optimizer {
         for (var inst : ir) {
             inst = substituteConstants(inst, constants);
             result.add(inst);
-            // Track new constant definitions
             if (inst instanceof IR.Copy c && isConstant(c.source())) {
                 constants.put(c.target(), c.source());
             } else if (inst instanceof IR.Label) {
-                constants.clear(); // conservative: labels = join points, reset known constants
+                constants.clear();
             }
         }
         return result;
@@ -167,8 +117,6 @@ public class Optimizer {
             default -> inst;
         };
     }
-
-    // ── Pass 3: Algebraic Simplifications ─────────────────────────────────────
 
     private List<IR> algebraicSimplificationPass(List<IR> ir) {
         List<IR> result = new ArrayList<>();
@@ -203,10 +151,7 @@ public class Optimizer {
         };
     }
 
-    // ── Pass 4: Common Subexpression Elimination ──────────────────────────────
-
     private List<IR> csePass(List<IR> ir) {
-        // value_number_map: (op, left, right) → first temp that computed this
         Map<String, String> cseMap = new HashMap<>();
         List<IR> result = new ArrayList<>();
         for (var inst : ir) {
@@ -219,25 +164,21 @@ public class Optimizer {
                 }
                 cseMap.put(key, b.result());
             }
-            if (inst instanceof IR.Label) cseMap.clear(); // conservative reset at join points
+            if (inst instanceof IR.Label) cseMap.clear();
             result.add(inst);
         }
         return result;
     }
 
-    // ── Pass 5: Copy Propagation ──────────────────────────────────────────────
-
     private List<IR> copyPropagationPass(List<IR> ir) {
-        Map<String, String> copies = new HashMap<>(); // x = y → copies[x] = y
+        Map<String, String> copies = new HashMap<>();
         List<IR> result = new ArrayList<>();
         for (var inst : ir) {
             if (inst instanceof IR.Copy c && !isConstant(c.source())) {
                 copies.put(c.target(), copies.getOrDefault(c.source(), c.source()));
             }
-            // Substitute copies in all instructions
             inst = substituteCopies(inst, copies);
             result.add(inst);
-            // Invalidate if target is written
             if (inst instanceof IR.BinOp b)    copies.entrySet().removeIf(e -> e.getValue().equals(b.result()) || e.getKey().equals(b.result()));
             else if (inst instanceof IR.Label)  copies.clear();
         }
@@ -253,14 +194,10 @@ public class Optimizer {
         };
     }
 
-    // ── Pass 6: Dead Code Elimination ─────────────────────────────────────────
-
     private List<IR> deadCodeEliminationPass(List<IR> ir) {
-        // Backward liveness analysis: a variable is "live" if used before being redefined
         Set<String> live = new HashSet<>();
         List<IR> result = new ArrayList<>();
 
-        // Pass backward
         for (int i = ir.size() - 1; i >= 0; i--) {
             IR inst = ir.get(i);
             boolean isDead = switch (inst) {
@@ -271,7 +208,6 @@ public class Optimizer {
             };
             if (isDead) { deadCodesEliminated++; continue; }
 
-            // Update live set (uses before defs)
             switch (inst) {
                 case IR.BinOp b   -> { live.add(b.left()); live.add(b.right()); live.remove(b.result()); }
                 case IR.UnaryOp u -> { live.add(u.operand()); live.remove(u.result()); }
@@ -280,15 +216,13 @@ public class Optimizer {
                 case IR.Return r  -> { if (r.value() != null) live.add(r.value()); }
                 case IR.Param p   -> live.add(p.value());
                 case IR.Print p   -> live.add(p.value());
-                case IR.Label l   -> {} // labels don't define/use vars
+                case IR.Label l   -> {}
                 default -> {}
             }
-            result.add(0, inst); // prepend (we're scanning backward)
+            result.add(0, inst);
         }
         return result;
     }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private boolean isConstant(String operand) {
         if ("null".equals(operand) || "true".equals(operand) || "false".equals(operand)) return true;

@@ -2,36 +2,7 @@ package com.conceptualware.core.compiler;
 
 import java.util.*;
 
-/**
- * Concept #10 — Semantic Analysis:
- *
- *   After syntactic analysis (parsing), the compiler performs SEMANTIC analysis
- *   to catch errors that are grammatically correct but meaningless:
- *
- *   1. SYMBOL TABLE / SCOPE RESOLUTION:
- *      - Build a scoped symbol table (stack of hash maps)
- *      - Each block/function creates a new scope; leaving it pops the scope
- *      - Variable references are resolved to their declaration scope
- *      - Shadowing rules: inner scope variable can shadow outer scope
- *
- *   2. TYPE CHECKING:
- *      - Infer or verify the type of every expression
- *      - Ensure operands match operator requirements (int+int ok, int+string error)
- *      - Coercion rules: int → float implicit, no others
- *      - Check function call arity and argument types
- *
- *   3. SEMANTIC VALIDATION:
- *      - Variable used before declaration
- *      - Assignment to constant
- *      - Return type mismatch with declared return type
- *      - break/continue outside loop
- *      - Duplicate variable/function names in same scope
- *
- *   Output: enriched symbol table + type map + list of semantic errors
- */
 public class SemanticAnalyzer {
-
-    // ── Symbol Table ──────────────────────────────────────────────────────────
 
     public record Symbol(
         String name,
@@ -43,7 +14,6 @@ public class SemanticAnalyzer {
 
     public enum SymbolKind { VARIABLE, FUNCTION, PARAMETER, CLASS }
 
-    /** Lexically scoped symbol table implemented as a stack of maps. */
     public static class SymbolTable {
         private final Deque<Map<String, Symbol>> scopes = new ArrayDeque<>();
 
@@ -69,18 +39,14 @@ public class SemanticAnalyzer {
         public List<Map<String, Symbol>> allScopes() { return new ArrayList<>(scopes); }
     }
 
-    // ── Analyzer State ────────────────────────────────────────────────────────
-
     private final SymbolTable symbolTable = new SymbolTable();
     private final Map<AST.Expr, String> typeMap = new IdentityHashMap<>();
     private final List<String> errors = new ArrayList<>();
     private int loopDepth = 0;
     private String currentFnReturnType = null;
 
-    // ── Public API ────────────────────────────────────────────────────────────
-
     public AnalysisResult analyze(AST.Stmt.Program program) {
-        symbolTable.enterScope(); // global scope
+        symbolTable.enterScope();
         registerBuiltins();
         for (var stmt : program.body()) analyzeStmt(stmt);
         symbolTable.exitScope();
@@ -94,8 +60,6 @@ public class SemanticAnalyzer {
     ) {
         public boolean hasErrors() { return !errors.isEmpty(); }
     }
-
-    // ── Statement Analysis ────────────────────────────────────────────────────
 
     private void analyzeStmt(AST.Stmt stmt) {
         switch (stmt) {
@@ -199,8 +163,6 @@ public class SemanticAnalyzer {
         }
     }
 
-    // ── Expression Analysis & Type Inference ──────────────────────────────────
-
     private String analyzeExpr(AST.Expr expr) {
         String type = inferType(expr);
         typeMap.put(expr, type);
@@ -244,7 +206,6 @@ public class SemanticAnalyzer {
                 if (callee instanceof AST.Expr.Identifier id) {
                     var sym = symbolTable.resolve(id.name());
                     if (sym.isEmpty()) { error("Undefined function '%s'".formatted(id.name()), c.line()); yield "unknown"; }
-                    // parse return type from signature fn(a,b)->retType
                     String sig = sym.get().type();
                     yield sig.contains("->") ? sig.substring(sig.lastIndexOf("->") + 2) : "unknown";
                 }
@@ -274,7 +235,7 @@ public class SemanticAnalyzer {
                 if (isNumeric(lt) && isNumeric(rt)) {
                     yield (lt.equals("float") || rt.equals("float")) ? "float" : "int";
                 }
-                if ("+".equals(b.op()) && "string".equals(lt)) yield "string"; // string concat
+                if ("+".equals(b.op()) && "string".equals(lt)) yield "string";
                 error("Invalid operand types '%s' %s '%s'".formatted(lt, b.op(), rt), b.line());
                 yield "unknown";
             }
@@ -285,14 +246,12 @@ public class SemanticAnalyzer {
         };
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
     private boolean isNumeric(String type)  { return "int".equals(type) || "float".equals(type); }
 
     private boolean isCompatible(String actual, String expected) {
         if (expected.equals("unknown") || actual.equals("unknown")) return true;
         if (actual.equals(expected)) return true;
-        return actual.equals("int") && expected.equals("float"); // widening
+        return actual.equals("int") && expected.equals("float");
     }
 
     private void error(String message, int line) {
