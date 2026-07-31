@@ -2,11 +2,6 @@ package com.conceptualware.core.datastructures;
 
 import java.util.*;
 
-/**
- * Concept #5 — Cache Eviction Policies: LFU (Least Frequently Used).
- *   Implementação O(1) get/put via dois mapas: chave→(valor,freq) e freq→LinkedHashSet(chaves),
- *   mantendo minFreq para eviction em tempo constante (técnica clássica de LFU O(1)).
- */
 public class LFUCache<K, V> {
 
     private final int capacity;
@@ -58,7 +53,7 @@ public class LFUCache<K, V> {
 
     private void evict() {
         LinkedHashSet<K> bucket = freqBuckets.get(minFreq);
-        K evictKey = bucket.iterator().next(); // least recently used dentro da menor frequência
+        K evictKey = bucket.iterator().next();
         bucket.remove(evictKey);
         if (bucket.isEmpty()) freqBuckets.remove(minFreq);
         values.remove(evictKey);
