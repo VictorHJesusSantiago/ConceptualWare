@@ -9,40 +9,45 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.HexFormat;
 
-/**
- * Concept #21 — CSRF Protection: padrão "Double-Submit Cookie" assinado com HMAC.
- *
- *   Como funciona:
- *   1. Servidor gera um token aleatório + timestamp e o assina com HMAC-SHA256
- *      usando um segredo que só o servidor conhece (evita forjar tokens).
- *   2. Token é enviado ao cliente em um cookie NÃO HttpOnly (JS precisa lê-lo)
- *      e o cliente deve reenviá-lo em um header custom (ex.: X-CSRF-Token) em
- *      toda requisição que muda estado (POST/PUT/PATCH/DELETE).
- *   3. Um atacante em outro domínio pode fazer o browser enviar o cookie
- *      automaticamente, mas NÃO consegue ler seu valor para colocá-lo no header
- *      (Same-Origin Policy) — por isso "double submit" neutraliza CSRF.
- *
- *   Nota: esta API usa JWT em memória/sessionStorage (ADR-004), não cookies de
- *   sessão HttpOnly — por isso CSRF clássico tem risco reduzido aqui. Este
- *   serviço existe como demonstração do conceito e para proteger o cenário
- *   futuro (fase 2 do ADR-004: refresh token em cookie HttpOnly).
- */
 @Service
 public class CsrfTokenService {
 
     private static final String HMAC_ALGO = "HmacSHA256";
-    private static final long TOKEN_VALIDITY_MS = 30 * 60 * 1000L; // 30 minutos
+    private static final long TOKEN_VALIDITY_MS = 30 * 60 * 1000L;
+    private static final int MIN_SECRET_LENGTH = 32;
+
     private final byte[] secretKey;
     private final SecureRandom secureRandom = new SecureRandom();
 
-    public CsrfTokenService() {
-        // Em produção: injetar via CSRF_SECRET (env var), nunca hardcoded.
-        // Aqui geramos por instância (suficiente para demo single-node).
-        this.secretKey = new byte[32];
-        secureRandom.nextBytes(secretKey);
+    public CsrfTokenService(
+            @org.springframework.beans.factory.annotation.Value("${app.csrf.secret:}") String configuredSecret,
+            org.springframework.core.env.Environment environment) {
+
+        boolean isProd = java.util.Arrays.asList(environment.getActiveProfiles()).contains("prod");
+
+        if (configuredSecret == null || configuredSecret.isBlank()) {
+            if (isProd) {
+                throw new IllegalStateException(
+                    "app.csrf.secret (env CSRF_SECRET) é obrigatório no perfil 'prod'. "
+                        + "Gere com: openssl rand -base64 48");
+            }
+            this.secretKey = new byte[MIN_SECRET_LENGTH];
+            secureRandom.nextBytes(this.secretKey);
+            org.slf4j.LoggerFactory.getLogger(CsrfTokenService.class).warn(
+                "CSRF_SECRET não configurado — usando segredo efêmero por instância. "
+                    + "Aceitável apenas fora de produção e com uma única réplica.");
+            return;
+        }
+
+        byte[] secretBytes = configuredSecret.getBytes(StandardCharsets.UTF_8);
+        if (secretBytes.length < MIN_SECRET_LENGTH) {
+            throw new IllegalStateException(
+                "app.csrf.secret deve ter ao menos " + MIN_SECRET_LENGTH + " bytes (256 bits); "
+                    + "recebido " + secretBytes.length + ".");
+        }
+        this.secretKey = secretBytes;
     }
 
-    /** Gera token no formato: base64(nonce).timestamp.hmacHex */
     public String generateToken() {
         byte[] nonce = new byte[16];
         secureRandom.nextBytes(nonce);
@@ -61,7 +66,6 @@ public class CsrfTokenService {
         String payload = parts[0] + "." + parts[1];
         String signature = parts[2];
 
-        // Comparação em tempo constante — evita timing attack na validação da assinatura
         if (!constantTimeEquals(hmac(payload), signature)) return false;
 
         try {
