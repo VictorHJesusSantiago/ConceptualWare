@@ -4,13 +4,8 @@ import org.junit.jupiter.api.*;
 
 import static org.assertj.core.api.Assertions.*;
 
-/**
- * Tests for Concept #30 — Generative Models and Reinforcement Learning
- */
 @DisplayName("Category 30 — Generative Models and Reinforcement Learning")
 class GenerativeAndRLTest {
-
-    // ── Autoencoder ───────────────────────────────────────────────────────────
 
     @Nested @DisplayName("Autoencoder")
     class AutoencoderTests {
@@ -49,8 +44,6 @@ class GenerativeAndRLTest {
         }
     }
 
-    // ── VAE ───────────────────────────────────────────────────────────────────
-
     @Nested @DisplayName("Variational Autoencoder (VAE)")
     class VAETests {
 
@@ -59,8 +52,8 @@ class GenerativeAndRLTest {
             var vae = new GenerativeModels.VAE(10, 8, 3, 42L);
             double[] x = new double[10];
             double[][] params = vae.encode(x);
-            assertThat(params[0]).hasSize(3);   // mu
-            assertThat(params[1]).hasSize(3);   // logVar
+            assertThat(params[0]).hasSize(3);
+            assertThat(params[1]).hasSize(3);
         }
 
         @Test @DisplayName("forward returns xHat, mu, logVar")
@@ -68,9 +61,9 @@ class GenerativeAndRLTest {
             var vae = new GenerativeModels.VAE(8, 6, 2, 1L);
             double[] x = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8};
             double[][] out = vae.forward(x);
-            assertThat(out[0]).hasSize(8);   // xHat
-            assertThat(out[1]).hasSize(2);   // mu
-            assertThat(out[2]).hasSize(2);   // logVar
+            assertThat(out[0]).hasSize(8);
+            assertThat(out[1]).hasSize(2);
+            assertThat(out[2]).hasSize(2);
         }
 
         @Test @DisplayName("VAE loss is finite and non-negative")
@@ -97,11 +90,9 @@ class GenerativeAndRLTest {
             double[] z2 = vae.reparameterize(mu, logVar);
             boolean allSame = true;
             for (int i = 0; i < z1.length; i++) if (Math.abs(z1[i]-z2[i]) > 1e-12) allSame = false;
-            assertThat(allSame).isFalse();   // stochastic sampling
+            assertThat(allSame).isFalse();
         }
     }
-
-    // ── GAN ───────────────────────────────────────────────────────────────────
 
     @Nested @DisplayName("GAN")
     class GANTests {
@@ -147,8 +138,6 @@ class GenerativeAndRLTest {
         }
     }
 
-    // ── DDPM ─────────────────────────────────────────────────────────────────
-
     @Nested @DisplayName("DDPM (Diffusion Model)")
     class DDPMTests {
 
@@ -157,8 +146,8 @@ class GenerativeAndRLTest {
             var ddpm = new GenerativeModels.DDPM(100, 8, 1e-4, 0.02, 42L);
             double[] x0 = new double[8];
             double[][] result = ddpm.forwardNoise(x0, 50);
-            assertThat(result[0]).hasSize(8);  // xₜ
-            assertThat(result[1]).hasSize(8);  // ε
+            assertThat(result[0]).hasSize(8);
+            assertThat(result[1]).hasSize(8);
         }
 
         @Test @DisplayName("at t=0 noisy sample is close to x0 (small noise)")
@@ -167,7 +156,6 @@ class GenerativeAndRLTest {
             double[] x0 = {0.5, 0.5, 0.5, 0.5};
             double[][] result = ddpm.forwardNoise(x0, 0);
             double[] xt = result[0];
-            // at t=0, sqrt(alphaBar) ≈ 1, sqrt(1-alphaBar) ≈ small
             for (int i = 0; i < 4; i++) {
                 assertThat(xt[i]).isCloseTo(x0[i], within(0.1));
             }
@@ -193,14 +181,11 @@ class GenerativeAndRLTest {
         @Test @DisplayName("sample produces output of correct size")
         void sampleShape() {
             var ddpm = new GenerativeModels.DDPM(10, 4, 1e-4, 0.02, 42L);
-            // Zero denoiser: predicts no noise (demonstrates API)
             GenerativeModels.Denoiser zeroDenoiser = (xt, t) -> new double[xt.length];
             double[] sample = ddpm.sample(zeroDenoiser);
             assertThat(sample).hasSize(4);
         }
     }
-
-    // ── Q-Learning ────────────────────────────────────────────────────────────
 
     @Nested @DisplayName("Q-Learning")
     class QLearningTests {
@@ -217,15 +202,12 @@ class GenerativeAndRLTest {
             for (int ep = 0; ep < 500; ep++) {
                 totalReward += ql.trainEpisode(env);
             }
-            // After 500 episodes, average reward should improve
-            // (some episodes reach goal = +10 reward)
-            assertThat(totalReward).isGreaterThan(-500 * 10);   // not all failures
+            assertThat(totalReward).isGreaterThan(-500 * 10);
         }
 
         @Test @DisplayName("Q-values are updated after training steps")
         void qValuesUpdated() {
             var ql = new ReinforcementLearning.QLearning(16, 4, 0.5, 0.9, 0.0, 1L);
-            // Force a specific update
             ql.update(0, 0, 1.0, 1, false);
             assertThat(ql.getQ(0, 0)).isGreaterThan(0);
         }
@@ -240,8 +222,6 @@ class GenerativeAndRLTest {
         }
     }
 
-    // ── SARSA ────────────────────────────────────────────────────────────────
-
     @Nested @DisplayName("SARSA")
     class SARSATests {
 
@@ -255,14 +235,10 @@ class GenerativeAndRLTest {
         @Test @DisplayName("terminal state gives zero next Q-value")
         void terminalZeroQ() {
             var sarsa = new ReinforcementLearning.SARSA(4, 2, 1.0, 0.9, 0.0, 0L);
-            // At terminal state, target = r + 0 (done=true)
             sarsa.update(0, 0, 10.0, 1, 0, true);
-            // Q(0,0) = 0 + 1.0 * (10 + 0.9*0 - 0) = 10
             assertThat(sarsa.getQ(0, 0)).isCloseTo(10.0, within(1e-6));
         }
     }
-
-    // ── Policy Gradient ───────────────────────────────────────────────────────
 
     @Nested @DisplayName("Policy Gradient (REINFORCE)")
     class PolicyGradientTests {
@@ -270,11 +246,6 @@ class GenerativeAndRLTest {
         @Test @DisplayName("policy parameters updated after episode")
         void parametersUpdated() {
             var pg = new ReinforcementLearning.PolicyGradient(4, 2, 0.01, 0.99, 42L);
-            // .clone() em double[][] é RASO — as linhas internas continuam sendo as
-            // mesmas referências. Como updateEpisode() muta theta[s][a] in-place,
-            // thetaBefore acabava apontando para os MESMOS arrays já mutados,
-            // fazendo a comparação abaixo nunca detectar diferença. Precisa de
-            // deep clone (linha por linha).
             double[][] thetaOriginal = pg.getTheta();
             double[][] thetaBefore = new double[thetaOriginal.length][];
             for (int s = 0; s < thetaOriginal.length; s++) {
@@ -282,9 +253,9 @@ class GenerativeAndRLTest {
             }
 
             pg.updateEpisode(
-                new int[]{0, 1, 2, 3},      // states
-                new int[]{0, 1, 0, 1},      // actions
-                new double[]{1, 2, 3, 4}    // rewards
+                new int[]{0, 1, 2, 3},
+                new int[]{0, 1, 0, 1},
+                new double[]{1, 2, 3, 4}
             );
 
             boolean changed = false;
@@ -309,8 +280,6 @@ class GenerativeAndRLTest {
             }
         }
     }
-
-    // ── DQN replay buffer ─────────────────────────────────────────────────────
 
     @Nested @DisplayName("DQN Replay Buffer")
     class DQNTests {

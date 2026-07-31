@@ -6,13 +6,8 @@ import java.util.Random;
 
 import static org.assertj.core.api.Assertions.*;
 
-/**
- * Tests for Concept #30 — GRU and XGBoost implementations
- */
 @DisplayName("Category 30 — GRU and XGBoost")
 class GRUXGBoostTest {
-
-    // ── GRU Tests ─────────────────────────────────────────────────────────────
 
     @Nested @DisplayName("GRU (Gated Recurrent Unit)")
     class GRUTests {
@@ -53,7 +48,6 @@ class GRUXGBoostTest {
             double[] hA = gru.step(xA, h.clone());
             double[] hB = gru.step(xB, h.clone());
 
-            // Different inputs → different hidden states
             boolean allEqual = true;
             for (int i = 0; i < 4; i++) {
                 if (Math.abs(hA[i] - hB[i]) > 1e-10) { allEqual = false; break; }
@@ -78,7 +72,7 @@ class GRUXGBoostTest {
             double[][] seq = new double[5][4];
 
             double[] out = GRU.bidirectional(seq, fwd, bwd);
-            assertThat(out).hasSize(16);   // 8 + 8
+            assertThat(out).hasSize(16);
         }
 
         @Test @DisplayName("paramCount matches expected formula 3*H*(H+I+1)")
@@ -90,12 +84,9 @@ class GRUXGBoostTest {
         }
     }
 
-    // ── XGBoost Tests ─────────────────────────────────────────────────────────
-
     @Nested @DisplayName("XGBoost (Gradient Boosting)")
     class XGBoostTests {
 
-        /** Simple linearly separable binary dataset */
         static double[][] X() {
             double[][] X = new double[200][2];
             Random rng = new Random(42);
@@ -127,7 +118,7 @@ class GRUXGBoostTest {
             for (int i = 0; i < preds.length; i++) if (preds[i] == truth[i]) correct++;
             double accuracy = (double) correct / preds.length;
 
-            assertThat(accuracy).isGreaterThan(0.95);   // near-perfect on linearly separable
+            assertThat(accuracy).isGreaterThan(0.95);
         }
 
         @Test @DisplayName("predictProba returns values in [0, 1]")
@@ -177,13 +168,11 @@ class GRUXGBoostTest {
                 if (ps[i] == ydata[i]) slowCorrect++;
                 if (pf[i] == ydata[i]) fastCorrect++;
             }
-            // Fast model should have higher (or equal) accuracy after same n rounds
             assertThat(fastCorrect).isGreaterThanOrEqualTo(slowCorrect);
         }
 
         @Test @DisplayName("regularization lambda prevents overfitting on tiny dataset")
         void regularizationEffect() {
-            // 6 samples — easy to overfit with lambda=0
             double[][] Xsmall = {{0},{1},{2},{3},{4},{5}};
             int[]  ysmall = {0, 0, 0, 1, 1, 1};
 
@@ -193,7 +182,6 @@ class GRUXGBoostTest {
             reg.fit(Xsmall, ysmall);
             noreg.fit(Xsmall, ysmall);
 
-            // Both should predict correctly on training data (too easy)
             int[] predsReg   = reg.predict(Xsmall);
             int[] predsNoreg = noreg.predict(Xsmall);
 
@@ -215,7 +203,6 @@ class GRUXGBoostTest {
             noPrune.fit(Xdata, ydata);
             prune.fit(Xdata, ydata);
 
-            // Pruned model should still classify reasonably
             int[] preds = prune.predict(Xdata);
             int correct = 0;
             for (int i = 0; i < ydata.length; i++) if (preds[i] == ydata[i]) correct++;

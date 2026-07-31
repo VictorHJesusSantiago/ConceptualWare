@@ -6,13 +6,9 @@ import java.util.Random;
 
 import static org.assertj.core.api.Assertions.*;
 
-/**
- * Tests for Concept #30 — Support Vector Machine (SVM)
- */
 @DisplayName("Category 30 — SVM (Support Vector Machine)")
 class SVMTest {
 
-    /** Linearly separable 2D dataset: two well-separated clusters */
     static double[][] X() {
         double[][] X = new double[100][2];
         Random rng = new Random(42);
@@ -95,9 +91,8 @@ class SVMTest {
         highC.fit(X(), y());
         lowC.fit(X(), y());
 
-        // Hard margin → fewer, well-placed support vectors
         assertThat(highC.getSupportVectorCount()).isLessThanOrEqualTo(
-            lowC.getSupportVectorCount() + 20   // some tolerance
+            lowC.getSupportVectorCount() + 20
         );
     }
 }
