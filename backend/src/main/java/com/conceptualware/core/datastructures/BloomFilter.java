@@ -3,11 +3,6 @@ package com.conceptualware.core.datastructures;
 import java.util.BitSet;
 import java.util.function.ToIntFunction;
 
-/**
- * Concept #5 — Bloom Filter: estrutura probabilística de pertencimento a conjunto.
- *   Sem falsos negativos, com falsos positivos controlados pela taxa configurada.
- *   Usa k funções hash independentes (double hashing: h_i(x) = h1(x) + i*h2(x)).
- */
 public class BloomFilter<T> {
 
     private final BitSet bits;
@@ -29,8 +24,12 @@ public class BloomFilter<T> {
         return h ^ (h >>> 7) ^ (h >>> 4);
     }
 
+    private static final int MAX_BIT_SIZE = 64 * 1024 * 1024;
+
     static int optimalBitSize(int n, double p) {
-        return (int) Math.ceil(-n * Math.log(p) / (Math.log(2) * Math.log(2)));
+        double bits = Math.ceil(-n * Math.log(p) / (Math.log(2) * Math.log(2)));
+        if (bits < 1) return 1;
+        return (int) Math.min(bits, MAX_BIT_SIZE);
     }
 
     static int optimalHashCount(int n, int m) {
@@ -46,7 +45,6 @@ public class BloomFilter<T> {
         }
     }
 
-    /** true = "possivelmente presente"; false = "com certeza ausente". */
     public boolean mightContain(T item) {
         int h1 = hash1.applyAsInt(item);
         int h2 = hash2.applyAsInt(item);

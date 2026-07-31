@@ -2,34 +2,15 @@ package com.conceptualware.core.datastructures;
 
 import java.util.*;
 
-/**
- * Concept #4 — K-D Tree (Árvore K-Dimensional):
- *   Binary space partitioning tree for multi-dimensional points.
- *   Partitions space by cycling through dimensions at each level.
- *
- *   Build:  O(n log n) — median-finding at each level
- *   Search: O(log n) average for nearest neighbor, O(n) worst case
- *   Range query: O(√n + k) where k = results returned
- *
- *   The key insight: at each node, split on dimension (depth % k).
- *   Points < split-value go left, points >= split-value go right.
- *
- *   Used by: spatial databases, machine learning (k-NN classifier),
- *            collision detection, ray tracing, geographic information systems.
- *
- * Concept #5 — Geometric algorithms, nearest-neighbor search, space partitioning
- */
 public class KDTree {
 
-    private final int k;   // number of dimensions
+    private final int k;
     private Node root;
     private int  size;
 
     public KDTree(int dimensions) {
         this.k = dimensions;
     }
-
-    // ── Point ─────────────────────────────────────────────────────────────────
 
     public record Point(double[] coords, String label) {
         public Point(double[] coords) { this(coords, null); }
@@ -50,20 +31,16 @@ public class KDTree {
         }
     }
 
-    // ── Node ─────────────────────────────────────────────────────────────────
-
     private static class Node {
         Point point;
         Node  left, right;
-        int   splitDim; // dimension used for partitioning at this node
+        int   splitDim;
 
         Node(Point point, int splitDim) {
             this.point    = point;
             this.splitDim = splitDim;
         }
     }
-
-    // ── Build (median-split construction) ────────────────────────────────────
 
     public void buildFromPoints(List<Point> points) {
         root = build(new ArrayList<>(points), 0);
@@ -75,7 +52,6 @@ public class KDTree {
 
         int dim = depth % k;
 
-        // Sort by current dimension and pick median for balanced tree
         points.sort(Comparator.comparingDouble(p -> p.coords()[dim]));
         int medianIdx = points.size() / 2;
 
@@ -84,8 +60,6 @@ public class KDTree {
         node.right = build(points.subList(medianIdx + 1, points.size()), depth + 1);
         return node;
     }
-
-    // ── Insert ────────────────────────────────────────────────────────────────
 
     public void insert(Point point) {
         root = insert(root, point, 0);
@@ -103,22 +77,9 @@ public class KDTree {
         return node;
     }
 
-    // ── Nearest Neighbor Search ───────────────────────────────────────────────
-
-    /**
-     * Finds the closest point to the query point using branch-and-bound:
-     *   1. Traverse down to leaf (like BST search on split dimension)
-     *   2. On the way back, check if the hypersphere of the current best
-     *      intersects the other side of the splitting hyperplane → if yes, search that side too.
-     */
     public Optional<Point> nearestNeighbor(Point query) {
         if (root == null) return Optional.empty();
         NearestResult result = new NearestResult(null, Double.MAX_VALUE);
-        // NearestResult é um record imutável — withCandidate() retorna uma NOVA
-        // instância. O valor de retorno da chamada recursiva estava sendo
-        // descartado aqui, então 'result' nunca era atualizado e ficava sempre
-        // (null, MAX_VALUE), fazendo nearestNeighbor() retornar Optional.empty()
-        // mesmo com a árvore populada.
         result = nearestNeighbor(root, query, result);
         return Optional.ofNullable(result.best);
     }
@@ -140,27 +101,21 @@ public class KDTree {
         Node   near   = diff < 0 ? node.left  : node.right;
         Node   far    = diff < 0 ? node.right : node.left;
 
-        result = nearestNeighbor(near, query, result); // search closer subtree first
+        result = nearestNeighbor(near, query, result);
 
-        // Prune: only search far side if the splitting hyperplane is within best distance
         if (diff * diff < result.bestDistSq()) {
             result = nearestNeighbor(far, query, result);
         }
         return result;
     }
 
-    // ── K Nearest Neighbors ───────────────────────────────────────────────────
-
-    /** Returns the k nearest points to query, sorted by distance. */
     public List<Point> kNearestNeighbors(Point query, int kNearest) {
-        // Max-heap of size k: keeps track of the k closest seen so far
         PriorityQueue<double[]> heap = new PriorityQueue<>(
             Comparator.comparingDouble((double[] a) -> a[0]).reversed()
         );
         List<Point> candidates = new ArrayList<>();
         collectKNearest(root, query, kNearest, heap, candidates);
 
-        // Return sorted by distance
         candidates.sort(Comparator.comparingDouble(p -> p.squaredDistanceTo(query)));
         return candidates.subList(0, Math.min(kNearest, candidates.size()));
     }
@@ -183,9 +138,6 @@ public class KDTree {
             collectKNearest(diff < 0 ? node.right : node.left, query, k, heap, best);
     }
 
-    // ── Range Search ─────────────────────────────────────────────────────────
-
-    /** Returns all points within a hypercube [min[i], max[i]] for each dimension. */
     public List<Point> rangeSearch(double[] min, double[] max) {
         List<Point> result = new ArrayList<>();
         rangeSearch(root, min, max, result);
