@@ -1,30 +1,15 @@
-##
-## ConceptualWare — Observability Stack
-## Concept #27 — Observabilidade e Monitoramento (COMPLETE):
-##   Jaeger       — Distributed Tracing (Span, Trace ID, APM)
-##   Elasticsearch— Log storage (ELK Stack — E)
-##   Logstash     — Log ingestion & transformation (ELK Stack — L)
-##   Kibana       — Log visualization & dashboards (ELK Stack — K)
-##   Prometheus   — Metrics scraping (Counter, Gauge, Timer, Histogram)
-##   Grafana      — Metrics dashboards (SLI, SLO, Error Budget)
-##
-## Run with main stack:
-##   docker compose -f docker-compose.yml -f docker-compose.observability.yml up
-##
-
 services:
 
-  # ── Jaeger — Distributed Tracing (Concept 27: Rastreamento distribuído, Span, Trace ID) ──
   jaeger:
     image: jaegertracing/all-in-one:1.53
     container_name: cw-jaeger
     environment:
-      COLLECTOR_OTLP_ENABLED: "true"        # Accept OTLP (OpenTelemetry Protocol) traces
+      COLLECTOR_OTLP_ENABLED: "true"
     ports:
-      - "16686:16686"   # Jaeger UI
-      - "4318:4318"     # OTLP HTTP receiver (backend sends traces here)
-      - "4317:4317"     # OTLP gRPC receiver
-      - "14268:14268"   # Jaeger Thrift HTTP (Zipkin-compatible)
+      - "16686:16686"
+      - "4318:4318"
+      - "4317:4317"
+      - "14268:14268"
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:16686/"]
       interval: 10s
@@ -33,14 +18,13 @@ services:
     networks:
       - cw-network
 
-  # ── Elasticsearch — Log storage (ELK: E) ────────────────────────────────────
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.3
     container_name: cw-elasticsearch
     environment:
       - discovery.type=single-node
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
-      - xpack.security.enabled=false          # disabled for dev; enable in prod
+      - xpack.security.enabled=false
       - xpack.security.http.ssl.enabled=false
     ports:
       - "9200:9200"
@@ -54,15 +38,14 @@ services:
     networks:
       - cw-network
 
-  # ── Logstash — Log ingestion & processing pipeline (ELK: L) ─────────────────
   logstash:
     image: docker.elastic.co/logstash/logstash:8.11.3
     container_name: cw-logstash
     volumes:
       - ./observability/logstash/pipeline:/usr/share/logstash/pipeline:ro
     ports:
-      - "5044:5044"    # Beats input (Filebeat)
-      - "5000:5000"    # TCP syslog input
+      - "5044:5044"
+      - "5000:5000"
     environment:
       LS_JAVA_OPTS: "-Xms256m -Xmx256m"
     depends_on:
@@ -71,12 +54,11 @@ services:
     networks:
       - cw-network
 
-  # ── Kibana — Log visualization & dashboards (ELK: K) ────────────────────────
   kibana:
     image: docker.elastic.co/kibana/kibana:8.11.3
     container_name: cw-kibana
     ports:
-      - "5601:5601"    # Kibana UI
+      - "5601:5601"
     environment:
       ELASTICSEARCH_HOSTS: '["http://elasticsearch:9200"]'
       XPACK_SECURITY_ENABLED: "false"
@@ -91,14 +73,13 @@ services:
     networks:
       - cw-network
 
-  # ── Prometheus — Metrics scraping (Concept 27: Counter, Gauge, Timer) ────────
   prometheus:
     image: prom/prometheus:v2.48.1
     container_name: cw-prometheus
     volumes:
       - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
-      - "9090:9090"    # Prometheus UI
+      - "9090:9090"
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=7d
@@ -106,12 +87,11 @@ services:
     networks:
       - cw-network
 
-  # ── Grafana — Metrics + Tracing dashboards (SLI, SLO, Error Budget) ──────────
   grafana:
     image: grafana/grafana:10.2.3
     container_name: cw-grafana
     ports:
-      - "3000:3000"    # Grafana UI
+      - "3000:3000"
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: conceptualware
@@ -131,4 +111,4 @@ volumes:
 
 networks:
   cw-network:
-    external: true    # shared with main docker-compose.yml
+    external: true

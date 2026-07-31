@@ -1,7 +1,4 @@
 #!/usr/bin/env sh
-# Pre-commit hook (Concept #14 — Clean Code enforcement, shift-left):
-# roda lint-staged (ESLint --fix) apenas nos arquivos staged de gateway/ e
-# frontend/, e bloqueia o commit se o typecheck de qualquer um dos dois falhar.
 
 set -e
 

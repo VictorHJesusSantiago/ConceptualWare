@@ -1,7 +1,6 @@
 version: '3.9'
 
 services:
-  # MongoDB — NoSQL Document Store (Concept 11)
   mongodb:
     image: mongo:7.0
     container_name: conceptualware-mongo
@@ -23,7 +22,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Java Spring Boot Backend — Core engine (Java mandatory stack)
   backend:
     build:
       context: ./backend
@@ -49,7 +47,6 @@ services:
       timeout: 10s
       retries: 3
 
-  # TypeScript/Node.js API Gateway — BFF layer (TypeScript mandatory stack)
   gateway:
     build:
       context: ./gateway
@@ -76,7 +73,6 @@ services:
       timeout: 5s
       retries: 3
 
-  # React Frontend — JavaScript/TypeScript SPA (JS mandatory stack)
   frontend:
     build:
       context: ./frontend
@@ -87,13 +83,12 @@ services:
     container_name: conceptualware-frontend
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "80:8080"
     depends_on:
       - gateway
     networks:
       - conceptualware-net
 
-  # Redis — Key-Value Store (Concept 11: caching, sessions, leaderboard, rate limiting)
   redis:
     image: redis:7.2-alpine
     container_name: conceptualware-redis
@@ -111,7 +106,6 @@ services:
       timeout: 3s
       retries: 3
 
-  # Cassandra — Wide-Column Store (Concept 11: time-series, write-heavy workloads, CQL)
   cassandra:
     image: cassandra:4.1
     container_name: conceptualware-cassandra
@@ -134,7 +128,6 @@ services:
       timeout: 10s
       retries: 5
 
-  # Neo4j — Graph Database (Concept 11: graph queries, Cypher, relationship traversal)
   neo4j:
     image: neo4j:5.17-community
     container_name: conceptualware-neo4j
@@ -145,8 +138,8 @@ services:
       NEO4J_dbms_memory_heap_initial__size: 256m
       NEO4J_dbms_memory_heap_max__size: 512m
     ports:
-      - "7474:7474"   # Browser UI
-      - "7687:7687"   # Bolt protocol
+      - "7474:7474"
+      - "7687:7687"
     volumes:
       - neo4j_data:/data
     networks:
@@ -157,7 +150,6 @@ services:
       timeout: 10s
       retries: 5
 
-  # InfluxDB — Time-Series Database (Concept 11: metrics, IoT, monitoring data)
   influxdb:
     image: influxdb:2.7-alpine
     container_name: conceptualware-influxdb
