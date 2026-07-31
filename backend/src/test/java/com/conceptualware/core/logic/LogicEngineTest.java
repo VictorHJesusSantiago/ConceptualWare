@@ -4,10 +4,6 @@ import org.junit.jupiter.api.*;
 import java.util.List;
 import static org.assertj.core.api.Assertions.*;
 
-/**
- * Concept #19 — TDD: Red-Green-Refactor cycle
- *   Teste unitário, AAA, Given-When-Then, Test isolation
- */
 @DisplayName("Logic Engine — Boolean Algebra & Propositional Logic")
 class LogicEngineTest {
 
@@ -17,8 +13,6 @@ class LogicEngineTest {
     void setUp() {
         engine = new LogicEngine();
     }
-
-    // ── Boolean Operators ──────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("Boolean Operators")
@@ -45,8 +39,6 @@ class LogicEngineTest {
         @Test void norFalseWhenAnyTrue()    { assertThat(engine.nor(true, false)).isFalse(); }
     }
 
-    // ── Implication ────────────────────────────────────────────────────────────
-
     @Nested
     @DisplayName("Implication (A → B)")
     class ImplicationTests {
@@ -58,8 +50,6 @@ class LogicEngineTest {
             assertThat(engine.implies(false, false)).isTrue();
         }
     }
-
-    // ── Truth Table ────────────────────────────────────────────────────────────
 
     @Test
     @DisplayName("AND truth table should have exactly 4 rows")
@@ -78,13 +68,10 @@ class LogicEngineTest {
     @Test
     @DisplayName("A OR NOT(A) is a tautology (law of excluded middle)")
     void aOrNotAIsTautology() {
-        // Build truth table for A OR ¬A
         var table = engine.evaluateAllCombinations(
             new String[]{"A"},
             vals -> engine.or(vals[0], engine.not(vals[0]))
         );
-        // evaluateAllCombinations retorna List<PropExpression>, não List<TruthTableRow>
-        // (isTautology/isContradiction operam sobre TruthTableRow) — checamos direto aqui.
         assertThat(table.stream().allMatch(LogicEngine.PropExpression::result)).isTrue();
     }
 
@@ -97,8 +84,6 @@ class LogicEngineTest {
         );
         assertThat(table.stream().noneMatch(LogicEngine.PropExpression::result)).isTrue();
     }
-
-    // ── Quantifiers ────────────────────────────────────────────────────────────
 
     @Test
     @DisplayName("∀ x: x > 0 holds for {1,2,3}")
@@ -118,16 +103,12 @@ class LogicEngineTest {
         assertThat(engine.exists(List.of(1, 2, 3), x -> x > 2)).isTrue();
     }
 
-    // ── Bitwise Operations ────────────────────────────────────────────────────
-
     @Test void bitwiseAnd()    { assertThat(engine.bitwiseAnd(0b1010, 0b1100)).isEqualTo(0b1000); }
     @Test void bitwiseOr()     { assertThat(engine.bitwiseOr(0b1010, 0b1100)).isEqualTo(0b1110); }
     @Test void bitwiseXor()    { assertThat(engine.bitwiseXor(0b1010, 0b1100)).isEqualTo(0b0110); }
     @Test void shiftLeft()     { assertThat(engine.shiftLeft(1, 3)).isEqualTo(8); }
     @Test void shiftRight()    { assertThat(engine.shiftRight(8, 3)).isEqualTo(1); }
     @Test void countSetBits()  { assertThat(engine.countSetBits(0b10110111)).isEqualTo(6); }
-
-    // ── Integer Overflow ──────────────────────────────────────────────────────
 
     @Test
     @DisplayName("Should detect integer overflow")
