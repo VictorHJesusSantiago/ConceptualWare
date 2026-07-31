@@ -1,12 +1,4 @@
-/**
- * MongoDB initialization script — Concept #11 (Databases: DDL, DML, indexes, aggregation)
- * Runs on first container start via MONGO_INITDB scripts.
- */
-
-// Switch to app database
 db = db.getSiblingDB('conceptualware');
-
-// ── Collections & Indexes ──────────────────────────────────────────────────────
 
 db.createCollection('users');
 db.users.createIndex({ email: 1 },    { unique: true, name: 'idx_users_email' });
@@ -28,8 +20,6 @@ db.createCollection('challenges');
 db.challenges.createIndex({ slug: 1 },       { unique: true, name: 'idx_challenges_slug' });
 db.challenges.createIndex({ difficulty: 1 }, { name: 'idx_challenges_difficulty' });
 db.challenges.createIndex({ category: 1 },   { name: 'idx_challenges_category' });
-
-// ── Seed: Algorithm documents ─────────────────────────────────────────────────
 
 const now = new Date();
 
@@ -181,8 +171,6 @@ db.algorithms.insertMany([
   },
 ]);
 
-// ── Seed: Admin user ─────────────────────────────────────────────────────────
-// Password: Admin@123 (BCrypt hash — change in production!)
 db.users.insertOne({
   _id: ObjectId(),
   username: 'admin',
