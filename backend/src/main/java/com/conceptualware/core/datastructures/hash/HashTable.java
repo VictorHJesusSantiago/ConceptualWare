@@ -2,11 +2,6 @@ package com.conceptualware.core.datastructures.hash;
 
 import java.util.*;
 
-/**
- * Concept #4 — Tabela hash, Conjunto (Set), Dicionário (Map), Multiset
- * Concept #5 — Algoritmos de hashing, collision resolution
- * Concept #28 — Propriedades matemáticas de funções hash
- */
 public class HashTable<K, V> {
 
     private static final int DEFAULT_CAPACITY = 16;
@@ -29,17 +24,12 @@ public class HashTable<K, V> {
         this.buckets = new Entry[capacity];
     }
 
-    // ── Hash Function ─────────────────────────────────────────────────────────
-
     private int hash(K key) {
         if (key == null) return 0;
         int h = key.hashCode();
-        // Fibonacci hashing — distributes keys more uniformly (Concept #5)
         h ^= (h >>> 16);
         return Math.abs(h % capacity);
     }
-
-    // ── CRUD Operations ───────────────────────────────────────────────────────
 
     public void put(K key, V value) {
         if ((float) size / capacity >= LOAD_FACTOR) resize();
@@ -95,10 +85,6 @@ public class HashTable<K, V> {
             Entry<K, V> curr = head;
             while (curr != null) {
                 Entry<K, V> next = curr.next;
-                // BUG CORRIGIDO: recalculava o índice com curr.key.hashCode() % capacity
-                // direto, sem o mesmo XOR-fold (h ^= h >>> 16) que hash() aplica — o
-                // bucket do resize divergia do bucket usado por get()/findEntry(),
-                // fazendo get() retornar null para chaves recém-realocadas.
                 int idx = hash(curr.key);
                 curr.next = newBuckets[idx];
                 newBuckets[idx] = curr;
@@ -120,8 +106,6 @@ public class HashTable<K, V> {
         return keys;
     }
 
-    // ── Bloom Filter ───────────────────────────────────────────────────────────
-
     public static class BloomFilter {
         private final long[] bitset;
         private final int size;
@@ -139,7 +123,6 @@ public class HashTable<K, V> {
             }
         }
 
-        /** Returns false = definitely NOT in set; true = POSSIBLY in set. */
         public boolean mightContain(String item) {
             for (int i = 0; i < hashFunctions; i++) {
                 if (!isBitSet(hash(item, i))) return false;
@@ -164,8 +147,6 @@ public class HashTable<K, V> {
             return Math.max(1, (int) Math.round((double) m / n * Math.log(2)));
         }
     }
-
-    // ── LRU Cache ────────────────────────────────────────────────────────────
 
     public static class LRUCache<K, V> {
         private final int capacity;

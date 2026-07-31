@@ -2,23 +2,16 @@ package com.conceptualware.core.datastructures.heap;
 
 import java.util.*;
 
-/**
- * Concept #4 — Heap mínimo (Min-Heap), Heap máximo (Max-Heap), Fila de prioridade
- * Concept #5 — Heap Sort, K-th largest/smallest
- * Concept #9 — Memória Heap (alocação dinâmica) vs Stack
- */
 public class Heap<T> {
 
     private final List<T> data = new ArrayList<>();
     private final Comparator<T> comparator;
     private final boolean isMinHeap;
 
-    /** Min-heap with natural ordering. */
     public static <T extends Comparable<T>> Heap<T> minHeap() {
         return new Heap<T>(Comparator.<T>naturalOrder(), true);
     }
 
-    /** Max-heap with natural ordering. */
     public static <T extends Comparable<T>> Heap<T> maxHeap() {
         return new Heap<T>(Comparator.<T>reverseOrder(), false);
     }
@@ -77,7 +70,6 @@ public class Heap<T> {
     public boolean isEmpty() { return data.isEmpty(); }
     public int size()        { return data.size(); }
 
-    /** Heapify an existing array in O(n). */
     public static <T extends Comparable<T>> Heap<T> heapify(List<T> items) {
         Heap<T> heap = Heap.minHeap();
         heap.data.addAll(items);
@@ -87,18 +79,15 @@ public class Heap<T> {
         return heap;
     }
 
-    /** HeapSort — O(n log n) (Concept #5). */
     public static <T extends Comparable<T>> List<T> heapSort(List<T> items) {
         Heap<T> maxH = Heap.maxHeap();
         maxH.data.addAll(items);
-        // Heapify
         for (int i = maxH.data.size() / 2 - 1; i >= 0; i--) maxH.siftDown(i);
         List<T> sorted = new ArrayList<>(items.size());
         while (!maxH.isEmpty()) sorted.add(0, maxH.poll());
         return sorted;
     }
 
-    /** K largest elements — uses min-heap of size K. O(n log k). */
     public static <T extends Comparable<T>> List<T> kLargest(List<T> items, int k) {
         Heap<T> minH = Heap.minHeap();
         for (T item : items) {
@@ -110,7 +99,6 @@ public class Heap<T> {
         return result;
     }
 
-    /** Priority Queue wrapper — Concept #4. */
     public static class PriorityQueue<T> {
         private final Heap<T> heap;
 
