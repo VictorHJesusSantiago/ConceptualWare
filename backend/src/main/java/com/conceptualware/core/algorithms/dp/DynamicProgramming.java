@@ -2,20 +2,8 @@ package com.conceptualware.core.algorithms.dp;
 
 import java.util.*;
 
-/**
- * Concept #5 — Programação Dinâmica (DP):
- *   Memoização, Tabulação, Problema da Mochila (Knapsack),
- *   LCS (Longest Common Subsequence), Coin Change, Edit Distance,
- *   Longest Increasing Subsequence, Matrix Chain Multiplication
- *
- * Concept #5 — Backtracking, Branch and Bound, Recursão de cauda
- * Concept #8 — FP: Memoização como técnica funcional
- */
 public class DynamicProgramming {
 
-    // ── Fibonacci — Bottom-up Tabulation vs Memoization ──────────────────────
-
-    /** Fibonacci via tabulação (bottom-up DP). O(n) time, O(1) space. */
     public static long fibTabulation(int n) {
         if (n <= 1) return n;
         long prev2 = 0, prev1 = 1;
@@ -26,16 +14,12 @@ public class DynamicProgramming {
         return prev1;
     }
 
-    /** Fibonacci via memoização (top-down DP). O(n) time and space. */
     private final Map<Integer, Long> memo = new HashMap<>();
     public long fibMemo(int n) {
         if (n <= 1) return n;
         return memo.computeIfAbsent(n, k -> fibMemo(k - 1) + fibMemo(k - 2));
     }
 
-    // ── 0/1 Knapsack — O(n*W) ────────────────────────────────────────────────
-
-    /** Classic 0/1 Knapsack: maximize value with weight ≤ capacity. */
     public static int knapsack01(int[] weights, int[] values, int capacity) {
         int n = weights.length;
         int[][] dp = new int[n + 1][capacity + 1];
@@ -49,7 +33,6 @@ public class DynamicProgramming {
         return dp[n][capacity];
     }
 
-    /** Unbounded Knapsack: each item can be used unlimited times. */
     public static int knapsackUnbounded(int[] weights, int[] values, int capacity) {
         int[] dp = new int[capacity + 1];
         for (int w = 1; w <= capacity; w++) {
@@ -59,8 +42,6 @@ public class DynamicProgramming {
         }
         return dp[capacity];
     }
-
-    // ── Longest Common Subsequence — O(m*n) ──────────────────────────────────
 
     public static int lcs(String a, String b) {
         int m = a.length(), n = b.length();
@@ -73,7 +54,6 @@ public class DynamicProgramming {
         return dp[m][n];
     }
 
-    /** Reconstruct the actual LCS string. */
     public static String lcsString(String a, String b) {
         int m = a.length(), n = b.length();
         int[][] dp = new int[m + 1][n + 1];
@@ -93,8 +73,6 @@ public class DynamicProgramming {
         return sb.toString();
     }
 
-    // ── Edit Distance (Levenshtein) — O(m*n) ─────────────────────────────────
-
     public static int editDistance(String a, String b) {
         int m = a.length(), n = b.length();
         int[][] dp = new int[m + 1][n + 1];
@@ -108,9 +86,6 @@ public class DynamicProgramming {
         return dp[m][n];
     }
 
-    // ── Coin Change — O(amount * coins) ──────────────────────────────────────
-
-    /** Minimum number of coins to make amount. */
     public static int coinChange(int[] coins, int amount) {
         int[] dp = new int[amount + 1];
         Arrays.fill(dp, amount + 1);
@@ -121,7 +96,6 @@ public class DynamicProgramming {
         return dp[amount] > amount ? -1 : dp[amount];
     }
 
-    /** Count distinct ways to make amount. */
     public static int coinChangeWays(int[] coins, int amount) {
         int[] dp = new int[amount + 1];
         dp[0] = 1;
@@ -130,8 +104,6 @@ public class DynamicProgramming {
                 dp[i] += dp[i - coin];
         return dp[amount];
     }
-
-    // ── Longest Increasing Subsequence — O(n log n) ───────────────────────────
 
     public static int lis(int[] arr) {
         List<Integer> tails = new ArrayList<>();
@@ -147,13 +119,9 @@ public class DynamicProgramming {
         return tails.size();
     }
 
-    // ── Longest Palindromic Subsequence ───────────────────────────────────────
-
     public static int longestPalindromicSubsequence(String s) {
         return lcs(s, new StringBuilder(s).reverse().toString());
     }
-
-    // ── Matrix Chain Multiplication — O(n³) ──────────────────────────────────
 
     public static int matrixChainMultiplication(int[] dims) {
         int n = dims.length - 1;
@@ -170,8 +138,6 @@ public class DynamicProgramming {
         }
         return dp[0][n - 1];
     }
-
-    // ── Backtracking — N-Queens ────────────────────────────────────────────────
 
     public static List<List<String>> solveNQueens(int n) {
         List<List<String>> solutions = new ArrayList<>();
@@ -191,7 +157,7 @@ public class DynamicProgramming {
             if (isValidQueenPlacement(queens, row, col)) {
                 queens[row] = col;
                 solveNQueensHelper(queens, row + 1, n, solutions);
-                queens[row] = -1; // backtrack
+                queens[row] = -1;
             }
         }
     }
@@ -214,8 +180,6 @@ public class DynamicProgramming {
         }
         return board;
     }
-
-    // ── Monte Carlo — Probabilistic Algorithm ─────────────────────────────────
 
     public static double estimatePi(int samples) {
         int inside = 0;

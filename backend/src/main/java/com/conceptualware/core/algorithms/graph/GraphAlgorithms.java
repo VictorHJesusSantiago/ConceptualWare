@@ -3,19 +3,9 @@ package com.conceptualware.core.algorithms.graph;
 import com.conceptualware.core.datastructures.graph.Graph;
 import java.util.*;
 
-/**
- * Concept #5 — Algoritmos de Grafos:
- *   Dijkstra, Bellman-Ford, Floyd-Warshall, Kruskal (MST), Prim (MST),
- *   A*, Fluxo Máximo (Ford-Fulkerson/Edmonds-Karp), Caixeiro Viajante (TSP)
- *
- * Concept #5 — Busca bidirecional, Detecção de ciclos
- * Concept #28 — Teoria dos grafos: caminho mais curto, MST
- */
 public class GraphAlgorithms {
 
     private static final double INF = Double.MAX_VALUE / 2;
-
-    // ── Dijkstra's Algorithm — O((V+E) log V) ─────────────────────────────────
 
     public static double[] dijkstra(Graph graph, int source) {
         int n = graph.vertices();
@@ -23,7 +13,6 @@ public class GraphAlgorithms {
         Arrays.fill(dist, INF);
         dist[source] = 0;
 
-        // Min-heap: (distance, vertex)
         PriorityQueue<int[]> pq = new PriorityQueue<>(Comparator.comparingDouble(a -> a[1]));
         pq.offer(new int[]{source, 0});
 
@@ -31,7 +20,7 @@ public class GraphAlgorithms {
             int[] curr = pq.poll();
             int u = curr[0];
             double d = curr[1];
-            if (d > dist[u]) continue; // stale entry
+            if (d > dist[u]) continue;
 
             for (Graph.Edge e : graph.neighbors(u)) {
                 double newDist = dist[u] + e.weight();
@@ -44,7 +33,6 @@ public class GraphAlgorithms {
         return dist;
     }
 
-    /** Dijkstra with path reconstruction. */
     public record ShortestPath(double[] distances, int[] predecessors) {}
 
     public static ShortestPath dijkstraWithPath(Graph graph, int source) {
@@ -81,31 +69,25 @@ public class GraphAlgorithms {
         return path;
     }
 
-    // ── Bellman-Ford — O(VE), handles negative weights ────────────────────────
-
     public static double[] bellmanFord(int n, List<int[]> edges, int source) {
         double[] dist = new double[n];
         Arrays.fill(dist, INF);
         dist[source] = 0;
 
-        // Relax all edges V-1 times
         for (int i = 0; i < n - 1; i++) {
-            for (int[] edge : edges) { // edge = [from, to, weight]
+            for (int[] edge : edges) {
                 if (dist[edge[0]] != INF) {
                     double newDist = dist[edge[0]] + edge[2];
                     if (newDist < dist[edge[1]]) dist[edge[1]] = newDist;
                 }
             }
         }
-        // Check for negative cycles
         for (int[] edge : edges) {
             if (dist[edge[0]] != INF && dist[edge[0]] + edge[2] < dist[edge[1]])
                 throw new IllegalStateException("Negative cycle detected");
         }
         return dist;
     }
-
-    // ── Floyd-Warshall — O(V³), all-pairs shortest paths ─────────────────────
 
     public static double[][] floydWarshall(double[][] adjMatrix) {
         int n = adjMatrix.length;
@@ -121,11 +103,9 @@ public class GraphAlgorithms {
         return dist;
     }
 
-    // ── Kruskal's MST — O(E log E), uses Union-Find ───────────────────────────
-
     public record MST(List<int[]> edges, double totalWeight) {}
 
-    public static MST kruskal(int n, List<int[]> edges) { // edge = [from, to, weight]
+    public static MST kruskal(int n, List<int[]> edges) {
         List<int[]> sortedEdges = new ArrayList<>(edges);
         sortedEdges.sort(Comparator.comparingInt(e -> e[2]));
 
@@ -142,8 +122,6 @@ public class GraphAlgorithms {
         }
         return new MST(mstEdges, totalWeight);
     }
-
-    // ── Prim's MST — O((V+E) log V) ──────────────────────────────────────────
 
     public static MST prim(Graph graph) {
         int n = graph.vertices();
@@ -178,8 +156,6 @@ public class GraphAlgorithms {
         return new MST(mstEdges, totalWeight);
     }
 
-    // ── A* Search — O(E log V), heuristic-guided ─────────────────────────────
-
     @FunctionalInterface
     public interface Heuristic { double estimate(int from, int to); }
 
@@ -212,8 +188,6 @@ public class GraphAlgorithms {
         }
         return Collections.emptyList();
     }
-
-    // ── Ford-Fulkerson Max Flow (Edmonds-Karp BFS) — O(VE²) ──────────────────
 
     public static int maxFlow(int[][] capacity, int source, int sink) {
         int n = capacity.length;
@@ -252,59 +226,65 @@ public class GraphAlgorithms {
         return totalFlow;
     }
 
-    // ── Tarjan's SCC — O(V+E), single-pass DFS with low-link values ──────────
-
-    private int tarjanTimer;
-    private int[] tarjanIndex, tarjanLow;
-    private boolean[] tarjanOnStack;
-    private Deque<Integer> tarjanStack;
-    private List<List<Integer>> tarjanResult;
-
-    /** Componentes fortemente conexos via Tarjan (single DFS, low-link). */
-    public List<List<Integer>> tarjanSCC(Graph graph) {
+    public static List<List<Integer>> tarjanSCC(Graph graph) {
         int n = graph.vertices();
-        tarjanTimer = 0;
-        tarjanIndex = new int[n];
-        tarjanLow = new int[n];
-        tarjanOnStack = new boolean[n];
-        tarjanStack = new ArrayDeque<>();
-        tarjanResult = new ArrayList<>();
-        Arrays.fill(tarjanIndex, -1);
+        int[] index   = new int[n];
+        int[] low     = new int[n];
+        boolean[] onStack = new boolean[n];
+        Arrays.fill(index, -1);
 
-        for (int v = 0; v < n; v++) {
-            if (tarjanIndex[v] == -1) tarjanDfs(graph, v);
-        }
-        return tarjanResult;
-    }
+        Deque<Integer> sccStack = new ArrayDeque<>();
+        List<List<Integer>> result = new ArrayList<>();
+        int timer = 0;
 
-    private void tarjanDfs(Graph graph, int v) {
-        tarjanIndex[v] = tarjanLow[v] = tarjanTimer++;
-        tarjanStack.push(v);
-        tarjanOnStack[v] = true;
+        Deque<int[]> callStack = new ArrayDeque<>();
+        List<List<Graph.Edge>> adjacency = new ArrayList<>(n);
+        for (int v = 0; v < n; v++) adjacency.add(graph.neighbors(v));
 
-        for (Graph.Edge e : graph.neighbors(v)) {
-            int w = e.to();
-            if (tarjanIndex[w] == -1) {
-                tarjanDfs(graph, w);
-                tarjanLow[v] = Math.min(tarjanLow[v], tarjanLow[w]);
-            } else if (tarjanOnStack[w]) {
-                tarjanLow[v] = Math.min(tarjanLow[v], tarjanIndex[w]);
+        for (int root = 0; root < n; root++) {
+            if (index[root] != -1) continue;
+
+            callStack.push(new int[]{root, 0});
+            index[root] = low[root] = timer++;
+            sccStack.push(root);
+            onStack[root] = true;
+
+            while (!callStack.isEmpty()) {
+                int[] frame = callStack.peek();
+                int v = frame[0];
+                List<Graph.Edge> neighbors = adjacency.get(v);
+
+                if (frame[1] < neighbors.size()) {
+                    int w = neighbors.get(frame[1]++).to();
+                    if (index[w] == -1) {
+                        index[w] = low[w] = timer++;
+                        sccStack.push(w);
+                        onStack[w] = true;
+                        callStack.push(new int[]{w, 0});
+                    } else if (onStack[w]) {
+                        low[v] = Math.min(low[v], index[w]);
+                    }
+                } else {
+                    callStack.pop();
+                    if (!callStack.isEmpty()) {
+                        int parent = callStack.peek()[0];
+                        low[parent] = Math.min(low[parent], low[v]);
+                    }
+                    if (low[v] == index[v]) {
+                        List<Integer> component = new ArrayList<>();
+                        int w;
+                        do {
+                            w = sccStack.pop();
+                            onStack[w] = false;
+                            component.add(w);
+                        } while (w != v);
+                        result.add(component);
+                    }
+                }
             }
         }
-
-        if (tarjanLow[v] == tarjanIndex[v]) {
-            List<Integer> component = new ArrayList<>();
-            int w;
-            do {
-                w = tarjanStack.pop();
-                tarjanOnStack[w] = false;
-                component.add(w);
-            } while (w != v);
-            tarjanResult.add(component);
-        }
+        return result;
     }
-
-    // ── Kosaraju's SCC — O(V+E), two DFS passes + transpose graph ────────────
 
     public static List<List<Integer>> kosarajuSCC(Graph graph) {
         int n = graph.vertices();
@@ -312,7 +292,7 @@ public class GraphAlgorithms {
         Deque<Integer> finishOrder = new ArrayDeque<>();
 
         for (int v = 0; v < n; v++) {
-            if (!visited[v]) kosarajuFillOrder(graph, v, visited, finishOrder);
+            if (!visited[v]) fillOrderIterative(graph, v, visited, finishOrder);
         }
 
         Graph transposed = graph.transpose();
@@ -323,30 +303,50 @@ public class GraphAlgorithms {
             int v = finishOrder.pop();
             if (!visited[v]) {
                 List<Integer> component = new ArrayList<>();
-                kosarajuCollect(transposed, v, visited, component);
+                collectIterative(transposed, v, visited, component);
                 components.add(component);
             }
         }
         return components;
     }
 
-    private static void kosarajuFillOrder(Graph graph, int v, boolean[] visited, Deque<Integer> order) {
-        visited[v] = true;
-        for (Graph.Edge e : graph.neighbors(v)) {
-            if (!visited[e.to()]) kosarajuFillOrder(graph, e.to(), visited, order);
+    private static void fillOrderIterative(Graph graph, int start, boolean[] visited, Deque<Integer> order) {
+        Deque<int[]> stack = new ArrayDeque<>();
+        stack.push(new int[]{start, 0});
+        visited[start] = true;
+
+        while (!stack.isEmpty()) {
+            int[] frame = stack.peek();
+            List<Graph.Edge> neighbors = graph.neighbors(frame[0]);
+
+            if (frame[1] < neighbors.size()) {
+                int w = neighbors.get(frame[1]++).to();
+                if (!visited[w]) {
+                    visited[w] = true;
+                    stack.push(new int[]{w, 0});
+                }
+            } else {
+                order.push(stack.pop()[0]);
+            }
         }
-        order.push(v);
     }
 
-    private static void kosarajuCollect(Graph graph, int v, boolean[] visited, List<Integer> component) {
-        visited[v] = true;
-        component.add(v);
-        for (Graph.Edge e : graph.neighbors(v)) {
-            if (!visited[e.to()]) kosarajuCollect(graph, e.to(), visited, component);
+    private static void collectIterative(Graph graph, int start, boolean[] visited, List<Integer> component) {
+        Deque<Integer> stack = new ArrayDeque<>();
+        stack.push(start);
+        visited[start] = true;
+
+        while (!stack.isEmpty()) {
+            int v = stack.pop();
+            component.add(v);
+            for (Graph.Edge e : graph.neighbors(v)) {
+                if (!visited[e.to()]) {
+                    visited[e.to()] = true;
+                    stack.push(e.to());
+                }
+            }
         }
     }
-
-    // ── TSP — Held-Karp DP — O(n² 2ⁿ) ──────────────────────────────────────
 
     public static double tspHeldKarp(double[][] dist) {
         int n = dist.length;
