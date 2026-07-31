@@ -11,10 +11,6 @@ import org.springframework.web.bind.annotation.*;
 import java.security.Principal;
 import java.util.Map;
 
-/**
- * Concept #25 — REST: expõe o bounded context de progresso do usuário
- * (dashboard de progresso no frontend consome estes endpoints).
- */
 @RestController
 @RequestMapping("/api/v1/progress")
 @RequiredArgsConstructor
