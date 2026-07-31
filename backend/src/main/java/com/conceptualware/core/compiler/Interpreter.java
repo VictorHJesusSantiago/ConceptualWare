@@ -2,50 +2,16 @@ package com.conceptualware.core.compiler;
 
 import java.util.*;
 
-/**
- * Concept #10 — Interpreter / REPL (Read-Eval-Print Loop):
- *
- *   An INTERPRETER directly executes the AST without a separate compilation step.
- *   This is in contrast to ahead-of-time (AOT) compilation.
- *
- *   INTERPRETER APPROACHES:
- *     1. Tree-Walking Interpreter (this implementation):
- *        Walk the AST nodes recursively, evaluating each node directly.
- *        Simple to implement; slower due to pointer chasing.
- *
- *     2. Bytecode Interpreter (JVM, CPython, Ruby MRI):
- *        Compile AST → compact bytecode → tight execution loop.
- *        Faster dispatch (table-driven), compact representation.
- *
- *     3. JIT Compilation (V8, HotSpot, PyPy):
- *        Identify hot code paths, compile to native at runtime.
- *        Best peak performance; high warm-up cost.
- *
- *   JIT vs AOT:
- *     JIT (Just-In-Time): compile at runtime; can use runtime profile info
- *       (inline based on actual receiver types, speculative optimization)
- *     AOT (Ahead-Of-Time): compile at build time; GraalVM native-image,
- *       Kotlin/Native — fast startup, predictable performance, no JIT warm-up
- *
- *   REPL: Read → Lex → Parse → Interpret → Print → Loop
- *     Enables interactive programming, immediate feedback.
- *     Used by: Python (CPython), Node.js, Ruby (irb), Java (JShell), Scala.
- */
 public class Interpreter {
-
-    // ── Runtime Values ────────────────────────────────────────────────────────
 
     private record ConceptFunction(AST.Stmt.FnDecl decl, Environment closure) {}
     private record ConceptArray(List<Object> elements) {}
     private record ConceptObject(String className, Map<String, Object> fields) {}
 
-    /** Signal exceptions for control flow (not real errors). */
     private static class ReturnSignal  extends RuntimeException { final Object value; ReturnSignal(Object v)  { super(null,null,true,false); value = v; } }
     private static class BreakSignal   extends RuntimeException { BreakSignal()   { super(null,null,true,false); } }
     private static class ContinueSignal extends RuntimeException { ContinueSignal() { super(null,null,true,false); } }
     public  static class RuntimeError  extends RuntimeException { RuntimeError(String msg) { super(msg); } }
-
-    // ── Environment (Scope) ───────────────────────────────────────────────────
 
     public static class Environment {
         private final Map<String, Object> vars = new LinkedHashMap<>();
@@ -68,16 +34,12 @@ public class Interpreter {
         }
     }
 
-    // ── Interpreter State ─────────────────────────────────────────────────────
-
     private Environment global = new Environment(null);
     private final StringBuilder output = new StringBuilder();
 
     public Interpreter() {
         registerBuiltins();
     }
-
-    // ── Public API ────────────────────────────────────────────────────────────
 
     public String execute(String source) {
         output.setLength(0);
@@ -101,12 +63,10 @@ public class Interpreter {
         return output.toString();
     }
 
-    /** REPL mode: stateful — each call shares the global environment. */
     public String executeRepl(String line) {
         output.setLength(0);
         try {
             var tokens = new Lexer(line).tokenize();
-            // Auto-add semicolon for expression statements in REPL
             String src = line.trim().endsWith(";") ? line : line + ";";
             tokens = new Lexer(src).tokenize();
             var program = new Parser(tokens).parse();
@@ -116,8 +76,6 @@ public class Interpreter {
         }
         return output.toString();
     }
-
-    // ── Statement Execution ───────────────────────────────────────────────────
 
     private void executeProgram(AST.Stmt.Program p) {
         for (var stmt : p.body()) executeStmt(stmt, global);
@@ -134,7 +92,7 @@ public class Interpreter {
                 env.define(v.name(), val);
             }
             case AST.Stmt.FnDecl f -> env.define(f.name(), new ConceptFunction(f, env));
-            case AST.Stmt.ClassDecl c -> env.define(c.name(), c); // class descriptor
+            case AST.Stmt.ClassDecl c -> env.define(c.name(), c);
             case AST.Stmt.If i -> {
                 if (isTruthy(evalExpr(i.condition(), env))) executeStmt(i.thenBranch(), env);
                 else if (i.elseBranch() != null)            executeStmt(i.elseBranch(), env);
@@ -172,8 +130,6 @@ public class Interpreter {
     private void executeBlock(AST.Stmt.Block b, Environment env) {
         for (var s : b.stmts()) executeStmt(s, env);
     }
-
-    // ── Expression Evaluation ─────────────────────────────────────────────────
 
     private Object evalExpr(AST.Expr expr, Environment env) {
         return switch (expr) {
@@ -220,7 +176,6 @@ public class Interpreter {
 
     private Object evalBinary(AST.Expr.BinaryOp b, Environment env) {
         Object left = evalExpr(b.left(), env);
-        // Short-circuit &&, ||
         if ("&&".equals(b.op())) return isTruthy(left) ? evalExpr(b.right(), env) : false;
         if ("||".equals(b.op())) return isTruthy(left) ? true : evalExpr(b.right(), env);
 
@@ -298,18 +253,9 @@ public class Interpreter {
         throw new RuntimeError("Not callable: " + callee);
     }
 
-    // ── Builtins ──────────────────────────────────────────────────────────────
-
     private void registerBuiltins() {
-        // We register builtins as ConceptFunctions with special handling in evalCall
-        // Instead, handle builtin calls by name in a special method
-        global.define("__builtins__", true); // marker
+        global.define("__builtins__", true);
     }
-
-    // Override evalCall to handle builtins by name
-    // (We detect them because their name resolves to a Java-side function descriptor)
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private boolean isTruthy(Object val) {
         if (val == null) return false;

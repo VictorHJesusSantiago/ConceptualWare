@@ -2,48 +2,24 @@ package com.conceptualware.core.compiler;
 
 import java.util.List;
 
-/**
- * Concept #10 — Abstract Syntax Tree (AST):
- *
- *   The AST is a TREE representation of the syntactic structure of source code.
- *   Unlike the Parse Tree (CST), the AST discards syntactic sugar and redundant
- *   nodes (parentheses, semicolons), keeping only semantically meaningful nodes.
- *
- *   Two categories:
- *     Stmt — statements (produce side effects, no value: if, while, var decl)
- *     Expr — expressions (produce a value: 1+2, fn call, literal)
- *
- *   Sealed interfaces enforce exhaustive pattern matching in the visitor/interpreter.
- *   Every statement or expression IS one of the listed subtypes — no others possible.
- *
- *   Visitor pattern (implicit via Java 21 pattern matching switch):
- *     Instead of accept(visitor), we use switch(node) { case IfStmt s -> ... }
- *     This is cleaner with sealed types and avoids the boilerplate double-dispatch.
- */
 public final class AST {
 
-    // ── Statements ────────────────────────────────────────────────────────────
-
-    /** A statement is executed for its side effects. Returns no value. */
     public sealed interface Stmt permits
         Stmt.Program, Stmt.Block, Stmt.VarDecl, Stmt.FnDecl,
         Stmt.ClassDecl, Stmt.Return, Stmt.If, Stmt.While,
         Stmt.For, Stmt.Break, Stmt.Continue, Stmt.Print, Stmt.ExprStmt {
 
-        /** Source line for error reporting */
         int line();
 
         record Program(List<Stmt> body, int line) implements Stmt {}
 
         record Block(List<Stmt> stmts, int line) implements Stmt {}
 
-        /** var x: int = 42; — type annotation optional for inference */
         record VarDecl(
             String name, String typeAnnotation, Expr initializer,
             boolean isConst, int line
         ) implements Stmt {}
 
-        /** fn add(a: int, b: int) -> int { ... } */
         record FnDecl(
             String name,
             List<Param> params,
@@ -54,7 +30,6 @@ public final class AST {
 
         record Param(String name, String type) {}
 
-        /** class Point { var x: int; var y: int; fn dist() -> float { ... } } */
         record ClassDecl(
             String name,
             List<VarDecl> fields,
@@ -72,9 +47,6 @@ public final class AST {
         record ExprStmt(Expr expr, int line) implements Stmt {}
     }
 
-    // ── Expressions ───────────────────────────────────────────────────────────
-
-    /** An expression evaluates to a value. */
     public sealed interface Expr permits
         Expr.Literal, Expr.Identifier, Expr.BinaryOp, Expr.UnaryOp,
         Expr.Assignment, Expr.Call, Expr.Index, Expr.Member,
@@ -82,43 +54,29 @@ public final class AST {
 
         int line();
 
-        /** Literal values: 42, 3.14, "hello", true, null */
         record Literal(Object value, int line) implements Expr {}
 
-        /** Variable or function reference by name */
         record Identifier(String name, int line) implements Expr {}
 
-        /** Binary operations: a + b, x < y, p && q */
         record BinaryOp(Expr left, String op, Expr right, int line) implements Expr {}
 
-        /** Unary operations: -x, !flag, ~bits, ++i, --j */
         record UnaryOp(String op, Expr operand, boolean prefix, int line) implements Expr {}
 
-        /** Assignment: x = 10, arr[i] = v, obj.field = v */
         record Assignment(Expr target, String op, Expr value, int line) implements Expr {}
 
-        /** Function call: add(1, 2), obj.method(args) */
         record Call(Expr callee, List<Expr> args, int line) implements Expr {}
 
-        /** Array index: arr[i] */
         record Index(Expr object, Expr index, int line) implements Expr {}
 
-        /** Member access: obj.field */
         record Member(Expr object, String field, int line) implements Expr {}
 
-        /** Ternary conditional: condition ? thenExpr : elseExpr */
         record Ternary(Expr condition, Expr thenExpr, Expr elseExpr, int line) implements Expr {}
 
-        /** Array literal: [1, 2, 3] */
         record ArrayLiteral(List<Expr> elements, int line) implements Expr {}
 
-        /** Object construction: new Point(1, 2) */
         record New(String className, List<Expr> args, int line) implements Expr {}
     }
 
-    // ── Pretty Printer ────────────────────────────────────────────────────────
-
-    /** Converts AST back to formatted source (round-trip pretty printing). */
     public static String prettyPrint(Stmt stmt) {
         return prettyPrint(stmt, 0);
     }
