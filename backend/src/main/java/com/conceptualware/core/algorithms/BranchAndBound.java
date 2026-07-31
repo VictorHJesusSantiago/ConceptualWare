@@ -2,42 +2,11 @@ package com.conceptualware.core.algorithms;
 
 import java.util.*;
 
-/**
- * Concept #5 — Branch and Bound (Ramificação e Poda):
- *   General algorithm design paradigm for optimization problems.
- *   Systematically explores the solution space as a tree, pruning branches
- *   that cannot yield a better solution than the current best.
- *
- *   Three operations:
- *     Branch: divide the problem into subproblems (children in search tree)
- *     Bound:  compute an upper/lower bound on the best achievable in that subtree
- *     Prune:  discard the subtree if the bound is worse than the current best
- *
- *   Implemented for two classic NP-hard problems:
- *     1. 0/1 Knapsack (maximization)
- *     2. Travelling Salesman Problem — TSP (minimization, partial tour)
- *
- * Concept #5 — Combinatorial optimization, NP-hard problems, bounding functions
- */
 public class BranchAndBound {
 
-    // ── 0/1 Knapsack — Branch and Bound ──────────────────────────────────────
-
-    /**
-     * 0/1 Knapsack via Branch and Bound.
-     *
-     * Upper bound: fractional relaxation (greedy on remaining items sorted by value/weight).
-     * Explores items in decreasing value-density order for stronger pruning.
-     *
-     * @param weights   item weights
-     * @param values    item values
-     * @param capacity  knapsack capacity
-     * @return maximum value achievable without exceeding capacity
-     */
     public static int knapsack(int[] weights, int[] values, int capacity) {
         int n = weights.length;
 
-        // Sort items by value/weight ratio descending (greedy order)
         Integer[] order = new Integer[n];
         for (int i = 0; i < n; i++) order[i] = i;
         Arrays.sort(order, (a, b) ->
@@ -56,7 +25,6 @@ public class BranchAndBound {
             return;
         }
 
-        // Compute fractional upper bound on this subtree
         double upperBound = currentValue;
         int remaining = capacity - currentWeight;
         for (int i = idx; i < order.length && remaining > 0; i++) {
@@ -70,34 +38,19 @@ public class BranchAndBound {
             }
         }
 
-        // Prune: if upper bound ≤ best known, this branch can't improve
         if (upperBound <= best[0]) return;
 
         int item = order[idx];
 
-        // Branch: include item (if feasible)
         if (currentWeight + weights[item] <= capacity) {
             bbKnapsack(order, weights, values, capacity,
                        idx + 1, currentWeight + weights[item],
                        currentValue + values[item], best);
         }
 
-        // Branch: exclude item
         bbKnapsack(order, weights, values, capacity, idx + 1, currentWeight, currentValue, best);
     }
 
-    // ── TSP — Branch and Bound ────────────────────────────────────────────────
-
-    /**
-     * Travelling Salesman Problem via Branch and Bound.
-     * Uses the "reduced cost matrix" bound: minimum cost to visit all remaining cities.
-     *
-     * Bound: row-reduce + column-reduce the remaining cost matrix.
-     * Each row/column must have at least one zero (represents a mandatory tour edge).
-     *
-     * @param dist  n×n distance matrix (dist[i][j] = cost from city i to j)
-     * @return minimum tour length visiting all cities exactly once
-     */
     public static int tspBranchAndBound(int[][] dist) {
         int n = dist.length;
         int[] bestCost = {Integer.MAX_VALUE};
@@ -115,13 +68,11 @@ public class BranchAndBound {
                                int depth, int currentCity, int currentCost,
                                int n, int[] best) {
         if (depth == n) {
-            // Complete tour: return to start
             int totalCost = currentCost + dist[currentCity][0];
             best[0] = Math.min(best[0], totalCost);
             return;
         }
 
-        // Lower bound: current cost + minimum outgoing edge from each unvisited city
         int lowerBound = currentCost;
         for (int i = 0; i < n; i++) {
             if (!visited[i]) {
@@ -135,7 +86,7 @@ public class BranchAndBound {
             }
         }
 
-        if (lowerBound >= best[0]) return; // Prune
+        if (lowerBound >= best[0]) return;
 
         for (int next = 0; next < n; next++) {
             if (!visited[next]) {
@@ -148,18 +99,9 @@ public class BranchAndBound {
         }
     }
 
-    // ── N-Queens — Branch and Bound ──────────────────────────────────────────
-
-    /**
-     * N-Queens: place N queens on an N×N board so no two attack each other.
-     * Branch: place queen in next row at each column.
-     * Bound:  prune if current column is attacked by any placed queen.
-     *
-     * @return list of all valid queen placements (each int[] is column positions per row)
-     */
     public static List<int[]> nQueens(int n) {
         List<int[]> solutions = new ArrayList<>();
-        int[] queens = new int[n]; // queens[row] = column
+        int[] queens = new int[n];
         Arrays.fill(queens, -1);
         solveNQueens(queens, 0, n, solutions);
         return solutions;
@@ -186,8 +128,6 @@ public class BranchAndBound {
         }
         return true;
     }
-
-    // ── Complexity analysis ───────────────────────────────────────────────────
 
     public record ComplexityAnalysis(String problem, String worstCase, String typicalPruning, String practicalUse) {
         public static ComplexityAnalysis[] all() {

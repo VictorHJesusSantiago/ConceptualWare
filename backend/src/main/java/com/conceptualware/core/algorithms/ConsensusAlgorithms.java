@@ -4,32 +4,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 
-/**
- * Concept #5 — Consensus Algorithms (Algoritmos de Consenso Distribuído):
- *
- *   RAFT — leader-based consensus protocol (Ongaro & Ousterhout, 2014).
- *     Designed for understandability. Key concepts:
- *       - Leader election: any node can become leader if it doesn't hear from current leader.
- *       - Log replication: all writes go through leader, replicated to majority before commit.
- *       - Terms: logical clock for leader validity.
- *       - Quorum: (n/2)+1 nodes must acknowledge before commit.
- *
- *   PAXOS — consensus protocol (Lamport, 1989).
- *     Three roles: Proposers, Acceptors, Learners.
- *     Two phases:
- *       Phase 1a (Prepare): proposer sends prepare(n) to acceptors
- *       Phase 1b (Promise): acceptors promise not to accept proposals < n
- *       Phase 2a (Accept): proposer sends accept(n, value)
- *       Phase 2b (Accepted): acceptors accept if still promised to n
- *
- *   Both algorithms tolerate f failures with 2f+1 nodes (Raft: n≥3 for 1 failure).
- *
- * Concept #5  — Distributed systems theory
- * Concept #17 — Concurrency: atomic operations, thread coordination
- */
 public class ConsensusAlgorithms {
-
-    // ── RAFT Simulation ───────────────────────────────────────────────────────
 
     public enum RaftState { FOLLOWER, CANDIDATE, LEADER }
 
@@ -40,9 +15,8 @@ public class ConsensusAlgorithms {
         private volatile int       votedFor    = -1;
         private final List<String> log         = new ArrayList<>();
         private volatile int       commitIndex = -1;
-        private volatile int       leaderFor   = -1; // term this node became leader
+        private volatile int       leaderFor   = -1;
 
-        // Cluster topology
         private final List<RaftNode> peers;
         private final AtomicInteger  voteCount = new AtomicInteger(0);
 
@@ -51,12 +25,11 @@ public class ConsensusAlgorithms {
             this.peers = peers;
         }
 
-        /** Start election: increment term, vote for self, request votes from peers. */
         public synchronized boolean startElection() {
             currentTerm++;
             state    = RaftState.CANDIDATE;
             votedFor = id;
-            voteCount.set(1); // vote for self
+            voteCount.set(1);
 
             int term = currentTerm;
             int logSize = log.size();
@@ -68,20 +41,19 @@ public class ConsensusAlgorithms {
                 }
             }
 
-            int quorum = (peers.size() + 1) / 2 + 1; // majority of cluster
+            int quorum = (peers.size() + 1) / 2 + 1;
             if (voteCount.get() >= quorum) {
                 state     = RaftState.LEADER;
                 leaderFor = currentTerm;
-                return true; // won election
+                return true;
             }
 
-            state = RaftState.FOLLOWER; // lost election
+            state = RaftState.FOLLOWER;
             return false;
         }
 
-        /** Respond to vote request. */
         public synchronized boolean requestVote(int term, int candidateId, int candidateLogSize) {
-            if (term < currentTerm) return false; // stale term
+            if (term < currentTerm) return false;
 
             if (term > currentTerm) {
                 currentTerm = term;
@@ -90,15 +62,11 @@ public class ConsensusAlgorithms {
             }
 
             boolean canVote = (votedFor == -1 || votedFor == candidateId)
-                           && candidateLogSize >= log.size(); // candidate log at least as up-to-date
+                           && candidateLogSize >= log.size();
             if (canVote) votedFor = candidateId;
             return canVote;
         }
 
-        /**
-         * AppendEntries RPC: log replication (also used as heartbeat with empty entries).
-         * Returns true if successfully replicated.
-         */
         public synchronized boolean appendEntries(int term, int leaderId, List<String> entries) {
             if (term < currentTerm) return false;
 
@@ -112,15 +80,11 @@ public class ConsensusAlgorithms {
             return true;
         }
 
-        /**
-         * Leader sends a command: appends to own log, replicates to majority, then commits.
-         * @return true if committed to majority quorum
-         */
         public synchronized boolean replicateCommand(String command) {
             if (state != RaftState.LEADER) return false;
 
             log.add(command);
-            int successCount = 1; // self
+            int successCount = 1;
 
             for (RaftNode peer : peers) {
                 if (peer.id != id) {
@@ -148,38 +112,28 @@ public class ConsensusAlgorithms {
         }
     }
 
-    /** Create a Raft cluster of n nodes, all cross-referencing each other. */
     public static List<RaftNode> createRaftCluster(int n) {
         List<RaftNode> nodes = new ArrayList<>();
-        List<RaftNode> ref   = new ArrayList<>(); // shared reference list
+        List<RaftNode> ref   = new ArrayList<>();
         for (int i = 0; i < n; i++) nodes.add(new RaftNode(i, ref));
         ref.addAll(nodes);
         return nodes;
     }
 
-    // ── PAXOS Simulation ──────────────────────────────────────────────────────
-
     public static class PaxosAcceptor {
         final int id;
-        private int    promisedN  = -1;  // highest proposal number promised to
-        private int    acceptedN  = -1;  // proposal number of accepted value
+        private int    promisedN  = -1;
+        private int    acceptedN  = -1;
         private String acceptedValue;
 
         public PaxosAcceptor(int id) { this.id = id; }
 
-        /**
-         * Phase 1b — Promise: acceptor promises not to accept proposals < n.
-         * Returns previously accepted value (if any) for proposer to use.
-         */
         public synchronized Optional<PaxosPromise> prepare(int proposalN) {
-            if (proposalN <= promisedN) return Optional.empty(); // reject stale
+            if (proposalN <= promisedN) return Optional.empty();
             promisedN = proposalN;
             return Optional.of(new PaxosPromise(id, proposalN, acceptedN, acceptedValue));
         }
 
-        /**
-         * Phase 2b — Accept: accept the proposal if still promised to it.
-         */
         public synchronized boolean accept(int proposalN, String value) {
             if (proposalN < promisedN) return false;
             acceptedN     = proposalN;
@@ -202,31 +156,23 @@ public class ConsensusAlgorithms {
             this.acceptors = acceptors;
         }
 
-        /**
-         * Full Paxos round: Phase 1 (Prepare/Promise) + Phase 2 (Accept/Accepted).
-         * @param proposedValue value this proposer wants to commit
-         * @return committed value (may differ if another proposer already succeeded)
-         */
         public Optional<String> propose(String proposedValue) {
             int n = generateProposalNumber();
             int quorum = acceptors.size() / 2 + 1;
 
-            // Phase 1: Prepare
             List<PaxosPromise> promises = new ArrayList<>();
             for (PaxosAcceptor acceptor : acceptors) {
                 acceptor.prepare(n).ifPresent(promises::add);
             }
 
-            if (promises.size() < quorum) return Optional.empty(); // failed to get quorum
+            if (promises.size() < quorum) return Optional.empty();
 
-            // If any acceptor already accepted a value, use the highest-numbered one
             String value = promises.stream()
                 .filter(p -> p.prevAcceptedN() >= 0)
                 .max(Comparator.comparingInt(PaxosPromise::prevAcceptedN))
                 .map(PaxosPromise::prevAcceptedValue)
-                .orElse(proposedValue); // use our proposed value if none previously accepted
+                .orElse(proposedValue);
 
-            // Phase 2: Accept
             int accepted = 0;
             for (PaxosAcceptor acceptor : acceptors) {
                 if (acceptor.accept(n, value)) accepted++;
@@ -236,8 +182,6 @@ public class ConsensusAlgorithms {
             return Optional.empty();
         }
 
-        // Proposal numbers must be unique and increasing across proposers
-        // Convention: proposalN = (counter * numProposers) + proposerId
         private int generateProposalNumber() {
             return ++proposalCounter * 100 + id;
         }
@@ -263,19 +207,6 @@ public class ConsensusAlgorithms {
         }
     }
 
-    // ── CAP Theorem explanation ───────────────────────────────────────────────
-
-    /**
-     * CAP Theorem: A distributed system can only guarantee 2 of:
-     *   C — Consistency (all nodes see same data at same time)
-     *   A — Availability (every request receives a response)
-     *   P — Partition tolerance (system works despite network splits)
-     *
-     *   Raft: CP — favors consistency (rejects writes during partition)
-     *   Paxos: CP — same
-     *   Cassandra: AP — eventual consistency, always available
-     *   ZooKeeper: CP — Raft-like consensus
-     */
     public record CAPClassification(String system, boolean consistent, boolean available,
                                      boolean partitionTolerant, String notes) {
         public static CAPClassification[] all() {

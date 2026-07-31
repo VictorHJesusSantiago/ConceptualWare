@@ -1,26 +1,8 @@
 package com.conceptualware.core.algorithms;
 
-/**
- * Concept #5 — IntroSort (Introsort):
- *   Hybrid sorting algorithm used by C++ std::sort and .NET Array.Sort.
- *   Combines three algorithms to guarantee O(n log n) worst case with low constants:
- *
- *   1. QuickSort   — O(n log n) average, cache-friendly, fast in practice
- *   2. HeapSort    — O(n log n) worst case guarantee (kicks in when recursion is too deep)
- *   3. InsertionSort — O(n²) but extremely fast for small arrays (n ≤ 16)
- *
- *   Strategy:
- *     - Recursion depth limit = 2·floor(log₂(n))
- *     - If depth exceeded → switch to HeapSort (prevents QuickSort's O(n²) worst case)
- *     - If partition size ≤ 16 → switch to InsertionSort (fewer comparisons, better cache)
- *
- * Concept #5 — Algorithm design: hybrid algorithms, adaptive sorting
- */
 public class IntroSort {
 
     private static final int INSERTION_SORT_THRESHOLD = 16;
-
-    // ── IntroSort entry point ─────────────────────────────────────────────────
 
     public static void sort(int[] arr) {
         if (arr == null || arr.length <= 1) return;
@@ -32,12 +14,12 @@ public class IntroSort {
         int size = hi - lo + 1;
 
         if (size <= INSERTION_SORT_THRESHOLD) {
-            insertionSort(arr, lo, hi);          // small partition → Insertion Sort
+            insertionSort(arr, lo, hi);
             return;
         }
 
         if (depthLimit == 0) {
-            heapSort(arr, lo, hi);               // depth exceeded → Heap Sort
+            heapSort(arr, lo, hi);
             return;
         }
 
@@ -48,20 +30,14 @@ public class IntroSort {
         introsort(arr, p + 1, hi, depthLimit - 1);
     }
 
-    // ── Median-of-three pivot selection ──────────────────────────────────────
-
-    /** Picks median of arr[a], arr[b], arr[c] — reduces chance of worst-case QuickSort. */
     private static int medianOfThree(int[] arr, int a, int b, int c) {
         if (arr[a] > arr[b]) swap(arr, a, b);
         if (arr[a] > arr[c]) swap(arr, a, c);
         if (arr[b] > arr[c]) swap(arr, b, c);
-        return arr[b]; // arr[b] is now the median
+        return arr[b];
     }
 
-    // ── Partition (Lomuto scheme) ─────────────────────────────────────────────
-
     private static int partition(int[] arr, int lo, int hi, int pivotVal) {
-        // Move pivot to end
         for (int i = lo; i <= hi; i++) {
             if (arr[i] == pivotVal) { swap(arr, i, hi); break; }
         }
@@ -73,8 +49,6 @@ public class IntroSort {
         swap(arr, i + 1, hi);
         return i + 1;
     }
-
-    // ── Insertion Sort (for small partitions) ────────────────────────────────
 
     private static void insertionSort(int[] arr, int lo, int hi) {
         for (int i = lo + 1; i <= hi; i++) {
@@ -88,15 +62,11 @@ public class IntroSort {
         }
     }
 
-    // ── Heap Sort (fallback for deep recursion) ───────────────────────────────
-
     private static void heapSort(int[] arr, int lo, int hi) {
         int n = hi - lo + 1;
 
-        // Build max-heap on the sub-array
         for (int i = n / 2 - 1; i >= 0; i--) heapify(arr, lo, n, i);
 
-        // Extract elements from heap
         for (int i = n - 1; i > 0; i--) {
             swap(arr, lo, lo + i);
             heapify(arr, lo, i, 0);
@@ -117,8 +87,6 @@ public class IntroSort {
         }
     }
 
-    // ── Pure QuickSort (for comparison) ──────────────────────────────────────
-
     public static void quickSort(int[] arr, int lo, int hi) {
         if (lo < hi) {
             int p = partitionHoare(arr, lo, hi);
@@ -127,7 +95,6 @@ public class IntroSort {
         }
     }
 
-    /** Hoare partition — fewer swaps than Lomuto on average. */
     private static int partitionHoare(int[] arr, int lo, int hi) {
         int pivot = arr[lo + (hi - lo) / 2];
         int i = lo - 1, j = hi + 1;
@@ -139,8 +106,6 @@ public class IntroSort {
         }
     }
 
-    // ── Pure Heap Sort (standalone) ───────────────────────────────────────────
-
     public static void heapSort(int[] arr) {
         int n = arr.length;
         for (int i = n / 2 - 1; i >= 0; i--) heapify(arr, 0, n, i);
@@ -150,8 +115,6 @@ public class IntroSort {
     private static void swap(int[] arr, int i, int j) {
         int tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
     }
-
-    // ── Complexity comparison ─────────────────────────────────────────────────
 
     public record SortComplexity(String algorithm, String best, String average, String worst, String space) {
         public static SortComplexity[] all() {

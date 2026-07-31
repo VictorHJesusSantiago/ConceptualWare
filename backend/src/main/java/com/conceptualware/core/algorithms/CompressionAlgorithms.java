@@ -4,42 +4,13 @@ import java.util.*;
 import java.io.*;
 import java.util.zip.*;
 
-/**
- * Concept #5 — Compression Algorithms (Algoritmos de Compressão):
- *
- *   LZ77 — sliding window dictionary compression (1977, Lempel-Ziv)
- *     Uses a sliding window as "dictionary" — encodes matches as (offset, length, next_char) triples.
- *     Foundation for: gzip, PNG, ZIP, zlib, DEFLATE.
- *
- *   LZW — dictionary-based compression (1984, Lempel-Ziv-Welch)
- *     Builds dictionary dynamically during encoding, no need to transmit dict.
- *     Used by: GIF, TIFF, old modem compression (V.42bis).
- *
- *   DEFLATE — LZ77 + Huffman coding (RFC 1951)
- *     Java's java.util.zip uses DEFLATE internally.
- *     Used by: gzip, PNG, ZIP, HTTP Content-Encoding: deflate.
- *
- *   Huffman Coding — optimal prefix-free entropy encoding.
- *     Used in: JPEG, MP3, DEFLATE second pass.
- *
- * Concept #5 — Greedy algorithms (Huffman), sliding window pattern
- */
 public class CompressionAlgorithms {
 
-    // ── LZ77 ──────────────────────────────────────────────────────────────────
-
-    /** LZ77 token: either a back-reference or a literal. */
     public sealed interface LZ77Token {
         record Literal(char ch) implements LZ77Token {}
         record Match(int offset, int length, char nextChar) implements LZ77Token {}
     }
 
-    /**
-     * LZ77 compression with sliding window.
-     * @param input        string to compress
-     * @param windowSize   search buffer size (lookback distance)
-     * @param lookaheadSize max match length
-     */
     public static List<LZ77Token> lz77Compress(String input, int windowSize, int lookaheadSize) {
         List<LZ77Token> tokens = new ArrayList<>();
         int pos = 0;
@@ -48,7 +19,6 @@ public class CompressionAlgorithms {
             int bestOffset = 0, bestLength = 0;
             int searchStart = Math.max(0, pos - windowSize);
 
-            // Find longest match in search buffer
             for (int i = searchStart; i < pos; i++) {
                 int len = 0;
                 while (len < lookaheadSize
@@ -90,12 +60,6 @@ public class CompressionAlgorithms {
         return sb.toString();
     }
 
-    // ── LZW ───────────────────────────────────────────────────────────────────
-
-    /**
-     * LZW compression: builds dictionary from input, outputs code indices.
-     * Initial dictionary: all single ASCII characters (256 entries).
-     */
     public static List<Integer> lzwCompress(String input) {
         Map<String, Integer> dict = new HashMap<>();
         for (int i = 0; i < 256; i++) dict.put(String.valueOf((char) i), i);
@@ -130,7 +94,7 @@ public class CompressionAlgorithms {
             if (dict.containsKey(code)) {
                 entry = dict.get(code);
             } else if (code == dict.size()) {
-                entry = prev + prev.charAt(0); // special case
+                entry = prev + prev.charAt(0);
             } else {
                 throw new IllegalArgumentException("Invalid LZW code: " + code);
             }
@@ -141,12 +105,6 @@ public class CompressionAlgorithms {
         return result.toString();
     }
 
-    // ── DEFLATE (via java.util.zip) ───────────────────────────────────────────
-
-    /**
-     * DEFLATE compression using Java's built-in Deflater (RFC 1951).
-     * Internally: LZ77 back-references + Huffman coding of (literal, length, distance) symbols.
-     */
     public static byte[] deflateCompress(byte[] input) throws IOException {
         Deflater deflater = new Deflater(Deflater.BEST_COMPRESSION, true);
         deflater.setInput(input);
@@ -181,9 +139,6 @@ public class CompressionAlgorithms {
         return baos.toByteArray();
     }
 
-    // ── Huffman Coding ────────────────────────────────────────────────────────
-
-    /** Huffman tree node. */
     private static class HuffmanNode implements Comparable<HuffmanNode> {
         char ch;
         int  freq;
@@ -200,7 +155,6 @@ public class CompressionAlgorithms {
         @Override public int compareTo(HuffmanNode o) { return Integer.compare(freq, o.freq); }
     }
 
-    /** Build Huffman tree and return the code table (char → bit string). */
     public static Map<Character, String> buildHuffmanCodes(String input) {
         Map<Character, Integer> freq = new HashMap<>();
         for (char c : input.toCharArray()) freq.merge(c, 1, Integer::sum);
@@ -208,7 +162,6 @@ public class CompressionAlgorithms {
         PriorityQueue<HuffmanNode> pq = new PriorityQueue<>();
         freq.forEach((c, f) -> pq.add(new HuffmanNode(c, f)));
 
-        // Single character special case
         if (pq.size() == 1) {
             Map<Character, String> codes = new HashMap<>();
             codes.put(pq.peek().ch, "0");
@@ -237,8 +190,6 @@ public class CompressionAlgorithms {
         return sb.toString();
     }
 
-    // ── Run-Length Encoding (RLE) ─────────────────────────────────────────────
-
     public static String rleEncode(String input) {
         if (input.isEmpty()) return "";
         StringBuilder sb = new StringBuilder();
@@ -256,8 +207,6 @@ public class CompressionAlgorithms {
         if (count > 1) sb.append(count);
         return sb.toString();
     }
-
-    // ── Compression ratio analysis ─────────────────────────────────────────────
 
     public record CompressionResult(String algorithm, int originalBytes, int compressedSize, double ratio) {
         public double savings() { return (1.0 - ratio) * 100; }
