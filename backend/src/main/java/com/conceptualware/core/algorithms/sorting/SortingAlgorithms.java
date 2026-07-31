@@ -2,21 +2,8 @@ package com.conceptualware.core.algorithms.sorting;
 
 import java.util.*;
 
-/**
- * Concept #5 — Algoritmos de Ordenação (todos implementados):
- *   Bubble, Selection, Insertion, Merge, Quick, Heap, Counting, Radix,
- *   Bucket, Shell, Tim, Intro Sort
- *
- * Concept #5 — Complexidade de tempo: O(n²) → O(n log n) → O(n) análise
- * Concept #5 — Divisão e conquista (Merge Sort, Quick Sort)
- * Concept #5 — Recursão, Recursão de cauda, Memoização
- * Concept #14 — Análise de complexidade: Big O, Θ, Ω
- */
 public class SortingAlgorithms {
 
-    // ── O(n²) Sorts ───────────────────────────────────────────────────────────
-
-    /** Bubble Sort — O(n²) avg, O(n) best (with early exit). */
     public static int[] bubbleSort(int[] arr) {
         int[] a = arr.clone();
         int n = a.length;
@@ -25,12 +12,11 @@ public class SortingAlgorithms {
             for (int j = 0; j < n - i - 1; j++) {
                 if (a[j] > a[j + 1]) { swap(a, j, j + 1); swapped = true; }
             }
-            if (!swapped) break; // O(n) best case with early exit
+            if (!swapped) break;
         }
         return a;
     }
 
-    /** Selection Sort — O(n²) always, O(1) space. */
     public static int[] selectionSort(int[] arr) {
         int[] a = arr.clone();
         for (int i = 0; i < a.length - 1; i++) {
@@ -42,7 +28,6 @@ public class SortingAlgorithms {
         return a;
     }
 
-    /** Insertion Sort — O(n²) avg, O(n) best, O(1) space. Stable. */
     public static int[] insertionSort(int[] arr) {
         int[] a = arr.clone();
         for (int i = 1; i < a.length; i++) {
@@ -53,7 +38,6 @@ public class SortingAlgorithms {
         return a;
     }
 
-    /** Shell Sort — O(n log² n) avg. */
     public static int[] shellSort(int[] arr) {
         int[] a = arr.clone();
         int gap = a.length / 2;
@@ -68,9 +52,6 @@ public class SortingAlgorithms {
         return a;
     }
 
-    // ── O(n log n) Sorts ─────────────────────────────────────────────────────
-
-    /** Merge Sort — O(n log n) always, O(n) space. Stable. Divide and Conquer. */
     public static int[] mergeSort(int[] arr) {
         if (arr.length <= 1) return arr.clone();
         int[] a = arr.clone();
@@ -80,7 +61,7 @@ public class SortingAlgorithms {
 
     private static void mergeSortHelper(int[] a, int left, int right) {
         if (left >= right) return;
-        int mid = left + (right - left) / 2; // Avoid overflow
+        int mid = left + (right - left) / 2;
         mergeSortHelper(a, left, mid);
         mergeSortHelper(a, mid + 1, right);
         merge(a, left, mid, right);
@@ -97,7 +78,6 @@ public class SortingAlgorithms {
         while (j < tmp.length)  a[k++] = tmp[j++];
     }
 
-    /** Quick Sort — O(n log n) avg, O(n²) worst. In-place. */
     public static int[] quickSort(int[] arr) {
         int[] a = arr.clone();
         quickSortHelper(a, 0, a.length - 1);
@@ -113,7 +93,6 @@ public class SortingAlgorithms {
     }
 
     private static int partition(int[] a, int low, int high) {
-        // Median-of-3 pivot selection (reduces worst case probability)
         int mid = low + (high - low) / 2;
         if (a[mid] < a[low]) swap(a, low, mid);
         if (a[high] < a[low]) swap(a, low, high);
@@ -127,13 +106,10 @@ public class SortingAlgorithms {
         return i + 1;
     }
 
-    /** Heap Sort — O(n log n) always, O(1) space. In-place. */
     public static int[] heapSort(int[] arr) {
         int[] a = arr.clone();
         int n = a.length;
-        // Build max-heap
         for (int i = n / 2 - 1; i >= 0; i--) heapify(a, n, i);
-        // Extract elements
         for (int i = n - 1; i > 0; i--) {
             swap(a, 0, i);
             heapify(a, i, 0);
@@ -148,9 +124,6 @@ public class SortingAlgorithms {
         if (largest != i) { swap(a, i, largest); heapify(a, n, largest); }
     }
 
-    // ── O(n) Sorts (Comparison-free) ─────────────────────────────────────────
-
-    /** Counting Sort — O(n + k), k = range. Only for integers. */
     public static int[] countingSort(int[] arr, int maxVal) {
         int[] count = new int[maxVal + 1];
         for (int x : arr) count[x]++;
@@ -161,7 +134,6 @@ public class SortingAlgorithms {
         return result;
     }
 
-    /** Radix Sort — O(d*(n+k)), stable, digit by digit. */
     public static int[] radixSort(int[] arr) {
         int[] a = arr.clone();
         int max = Arrays.stream(a).max().orElse(0);
@@ -184,7 +156,6 @@ public class SortingAlgorithms {
         System.arraycopy(output, 0, a, 0, n);
     }
 
-    /** Bucket Sort — O(n + k) avg, O(n²) worst. Good for uniform distribution. */
     public static double[] bucketSort(double[] arr) {
         int n = arr.length;
         @SuppressWarnings("unchecked")
@@ -204,17 +175,12 @@ public class SortingAlgorithms {
         return result;
     }
 
-    // ── Hybrid Sorts ─────────────────────────────────────────────────────────
-
-    /** TimSort — Java's default sort (simplified). Merges runs of insertion sort. */
     public static int[] timSort(int[] arr) {
         int[] a = arr.clone();
         int RUN = 32;
         int n = a.length;
-        // Sort individual subarrays of size RUN
         for (int i = 0; i < n; i += RUN)
             insertionSortRange(a, i, Math.min(i + RUN - 1, n - 1));
-        // Merge sorted runs
         for (int size = RUN; size < n; size *= 2) {
             for (int left = 0; left < n; left += 2 * size) {
                 int mid = Math.min(left + size - 1, n - 1);
@@ -232,8 +198,6 @@ public class SortingAlgorithms {
             a[j + 1] = key;
         }
     }
-
-    // ── Complexity Analysis Helper ────────────────────────────────────────────
 
     public record ComplexityInfo(String name, String timeAvg, String timeWorst,
                                   String timeBest, String space, boolean stable) {}
@@ -253,20 +217,30 @@ public class SortingAlgorithms {
         );
     }
 
-    // ── Step-by-step variants for WebSocket streaming (Concept #18) ──────────
+    public static final int MAX_STEP_VISUALIZATION_SIZE = 100;
 
-    public static List<com.conceptualware.api.websocket.AlgorithmWebSocketHandler.StepFrame> bubbleSortWithSteps(int[] arr) {
-        List<com.conceptualware.api.websocket.AlgorithmWebSocketHandler.StepFrame> steps = new ArrayList<>();
+    private static void requireVisualizableSize(int[] arr) {
+        if (arr.length > MAX_STEP_VISUALIZATION_SIZE) {
+            throw new IllegalArgumentException(
+                "Visualização passo a passo limitada a " + MAX_STEP_VISUALIZATION_SIZE
+                    + " elementos (recebido " + arr.length + "): o número de passos cresce com n² e "
+                    + "cada passo copia o array inteiro.");
+        }
+    }
+
+    public static List<SortStep> bubbleSortWithSteps(int[] arr) {
+        requireVisualizableSize(arr);
+        List<SortStep> steps = new ArrayList<>();
         int[] a = arr.clone();
         int n = a.length;
         for (int i = 0; i < n - 1; i++) {
             boolean swapped = false;
             for (int j = 0; j < n - i - 1; j++) {
-                steps.add(new com.conceptualware.api.websocket.AlgorithmWebSocketHandler.StepFrame(
+                steps.add(new SortStep(
                     new int[]{j, j+1}, new int[]{}, a.clone()));
                 if (a[j] > a[j + 1]) {
                     swap(a, j, j + 1); swapped = true;
-                    steps.add(new com.conceptualware.api.websocket.AlgorithmWebSocketHandler.StepFrame(
+                    steps.add(new SortStep(
                         new int[]{}, new int[]{j, j+1}, a.clone()));
                 }
             }
@@ -275,18 +249,19 @@ public class SortingAlgorithms {
         return steps;
     }
 
-    public static List<com.conceptualware.api.websocket.AlgorithmWebSocketHandler.StepFrame> insertionSortWithSteps(int[] arr) {
-        List<com.conceptualware.api.websocket.AlgorithmWebSocketHandler.StepFrame> steps = new ArrayList<>();
+    public static List<SortStep> insertionSortWithSteps(int[] arr) {
+        requireVisualizableSize(arr);
+        List<SortStep> steps = new ArrayList<>();
         int[] a = arr.clone();
         for (int i = 1; i < a.length; i++) {
             int key = a[i], j = i - 1;
             while (j >= 0 && a[j] > key) {
-                steps.add(new com.conceptualware.api.websocket.AlgorithmWebSocketHandler.StepFrame(
+                steps.add(new SortStep(
                     new int[]{j, j+1}, new int[]{j, j+1}, a.clone()));
                 a[j + 1] = a[j--];
             }
             a[j + 1] = key;
-            steps.add(new com.conceptualware.api.websocket.AlgorithmWebSocketHandler.StepFrame(
+            steps.add(new SortStep(
                 new int[]{}, new int[]{j+1}, a.clone()));
         }
         return steps;

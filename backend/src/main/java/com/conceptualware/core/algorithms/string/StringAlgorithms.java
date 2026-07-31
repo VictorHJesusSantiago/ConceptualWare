@@ -2,17 +2,7 @@ package com.conceptualware.core.algorithms.string;
 
 import java.util.*;
 
-/**
- * Concept #5 — Algoritmos de String:
- *   KMP (Knuth-Morris-Pratt), Rabin-Karp, Boyer-Moore,
- *   Hashing, compressão Huffman, algoritmos de busca de padrão
- *
- * Concept #28 — Expressões regulares (base formal), Autômatos finitos
- * Concept #10 — Tokenizer / Lexer concepts
- */
 public class StringAlgorithms {
-
-    // ── KMP — O(n + m) pattern matching ──────────────────────────────────────
 
     public static List<Integer> kmpSearch(String text, String pattern) {
         List<Integer> matches = new ArrayList<>();
@@ -31,7 +21,6 @@ public class StringAlgorithms {
         return matches;
     }
 
-    /** Longest Proper Prefix which is also Suffix (LPS / failure function). */
     private static int[] computeLPS(String pattern) {
         int m = pattern.length();
         int[] lps = new int[m];
@@ -43,8 +32,6 @@ public class StringAlgorithms {
         }
         return lps;
     }
-
-    // ── Rabin-Karp — O(n + m) avg, O(nm) worst ────────────────────────────────
 
     public static List<Integer> rabinKarpSearch(String text, String pattern) {
         List<Integer> matches = new ArrayList<>();
@@ -69,8 +56,6 @@ public class StringAlgorithms {
         }
         return matches;
     }
-
-    // ── Boyer-Moore (Bad Character heuristic) ─────────────────────────────────
 
     public static List<Integer> boyerMooreSearch(String text, String pattern) {
         List<Integer> matches = new ArrayList<>();
@@ -97,8 +82,6 @@ public class StringAlgorithms {
         for (int i = 0; i < pattern.length(); i++) table[pattern.charAt(i)] = i;
         return table;
     }
-
-    // ── Huffman Coding — Concept #5 ──────────────────────────────────────────
 
     public static class HuffmanNode implements Comparable<HuffmanNode> {
         char ch;
@@ -143,8 +126,6 @@ public class StringAlgorithms {
         return sb.toString();
     }
 
-    // ── Anagram Detection ─────────────────────────────────────────────────────
-
     public static boolean isAnagram(String a, String b) {
         if (a.length() != b.length()) return false;
         int[] count = new int[26];
@@ -156,8 +137,6 @@ public class StringAlgorithms {
         return true;
     }
 
-    // ── Palindrome Check ───────────────────────────────────────────────────────
-
     public static boolean isPalindrome(String s) {
         int l = 0, r = s.length() - 1;
         while (l < r) {
@@ -166,7 +145,6 @@ public class StringAlgorithms {
         return true;
     }
 
-    /** Longest Palindromic Substring — Manacher's algorithm O(n). */
     public static String longestPalindromicSubstring(String s) {
         String t = "#" + String.join("#", s.split("")) + "#";
         int n = t.length();
@@ -184,9 +162,6 @@ public class StringAlgorithms {
         return s.substring(start, start + maxLen);
     }
 
-    // ── Z-Algorithm — O(n), pattern matching via Z-array ──────────────────────
-
-    /** Z[i] = tamanho do maior prefixo comum entre s e o sufixo de s começando em i. */
     public static int[] zArray(String s) {
         int n = s.length();
         int[] z = new int[n];
@@ -199,7 +174,6 @@ public class StringAlgorithms {
         return z;
     }
 
-    /** Busca de padrão via Z-algorithm: concatena pattern + separador + text. */
     public static List<Integer> zSearch(String text, String pattern) {
         List<Integer> matches = new ArrayList<>();
         String combined = pattern + "" + text;
@@ -210,8 +184,6 @@ public class StringAlgorithms {
         }
         return matches;
     }
-
-    // ── Aho-Corasick — O(n + m + z), multi-pattern matching via autômato ──────
 
     public static class AhoCorasick {
         private static class Node {
@@ -257,7 +229,6 @@ public class StringAlgorithms {
             }
         }
 
-        /** Retorna, para cada padrão encontrado, a lista de índices finais (0-indexed) na string. */
         public Map<String, List<Integer>> search(String text) {
             Map<String, List<Integer>> results = new HashMap<>();
             Node curr = root;
@@ -272,8 +243,6 @@ public class StringAlgorithms {
             return results;
         }
     }
-
-    // ── String Hashing ─────────────────────────────────────────────────────────
 
     public static long polynomialHash(String s, long base, long mod) {
         long hash = 0, power = 1;
